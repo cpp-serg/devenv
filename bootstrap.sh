@@ -1,5 +1,5 @@
 #!/bin/bash
-# sh -c "$(curl -fsSL https://raw.githubusercontent.com/cpp-serg/devenv/bootstrap.sh)"
+# sh -c "$(curl -fsSL https://raw.githubusercontent.com/cpp-serg/devenv/main/bootstrap.sh)"
 
 TARGET_ROOT=~/devenv
 
