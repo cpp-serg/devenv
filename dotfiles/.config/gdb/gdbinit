@@ -1,0 +1,3 @@
+set history save on
+set history expansion on
+set debuginfod enabled on
