@@ -1,0 +1,50 @@
+[inlcude]
+    path=/home/spastukhov/.config/git/mocha.gitconfig
+
+[credential]
+    helper = store
+[user]
+    name = Sergiy Pastukhov
+    email = sergiy@jpu.io
+[alias]
+    logpretty ="!git log --abbrev-commit --decorate --format=format:'%C(bold blue)%h%C(reset) - %C(bold green)(%as)%C(reset) %C(bold white)%s%C(reset) %C(dim white)-%C(reverse brightyellow)%d%C(reset)%C(blue)(%an)%C(reset)'"
+    loggraph ="!git logpretty --graph"
+    #lg1 ="!git loggraph --topo-order"
+    lg1 ="!git loggraph"
+    lga ="!git lg1 --all"
+    bt ="!git lga --simplify-by-decoration"
+    lg2 = log --graph --abbrev-commit --decorate --format=format:'%C(bold blue)%h%C(reset) - %C(bold cyan)%aD%C(reset) %C(bold green)(%ar)%C(reset)%C(bold yellow)%d%C(reset)%n''          %C(white)%s%C(reset) %C(dim white)- %an%C(reset)' --all
+    lg = !git lg1
+    lgv ="!git logpretty --topo-order --first-parent"
+[core]
+    #pager = less -S
+    pager = delta
+[interactive]
+    diffFilter = delta --color-only --features=interactive
+[delta]
+    features = decorations
+    #features = catppuccin-mocha
+
+[delta "interactive"]
+    keep-plus-minus-markers = false
+
+[delta "decorations"]
+    commit-decoration-style = blue ol
+    commit-style = raw
+    file-style = omit
+    hunk-header-decoration-style = blue box
+    hunk-header-file-style = red
+    hunk-header-line-number-style = "#067a00"
+    hunk-header-style = file line-number syntax
+    syntax-theme = gruvbox-dark
+    #syntax-theme = "Monokai Extended"
+    #syntax-theme = GitHub
+    #syntax-theme = gruvbox-dark
+[gc]
+    autoDetach = false
+[merge]
+    conflictstyle = diff3
+    tool = nvimdiff
+
+[rerere]
+    enabled = true
