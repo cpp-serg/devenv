@@ -2,6 +2,18 @@
 vim.g.loaded_netrw = 1
 vim.g.loaded_netrwPlugin = 1
 
+-- User Config
+-- ---
+vim.g.user = {
+  leaderkey = ' ',
+  transparent = false,
+  event = 'UserGroup',
+  config = {
+    undodir = vim.fn.stdpath('cache') .. '/undo',
+  },
+}
+vim.api.nvim_create_augroup(vim.g.user.event, {})
+
 vim.g.python3_host_prog = '/usr/local/python-3.11.3/bin/python3.11'
 
 vim.g.have_nerd_font = true
@@ -9,8 +21,8 @@ vim.g.have_nerd_font = true
 -- optionally enable 24-bit colour
 vim.opt.termguicolors = true
 
-vim.g.mapleader = ' '
-vim.g.maplocalleader = ' '
+vim.g.mapleader = vim.g.user.leaderkey
+vim.g.maplocalleader = vim.g.user.leaderkey
 
 vim.g.syntax = 1
 
@@ -100,6 +112,23 @@ vim.opt.rtp:prepend(lazypath)
 require('lazy').setup('plugins')
 ------------------------------------------------------------
 
+-- -- From vim defaults.vim
+-- ---
+-- When editing a file, always jump to the last known cursor position.
+-- Don't do it when the position is invalid, when inside an event handler
+-- (happens when dropping a file on gvim) and for a commit message (it's
+-- likely a different one than last time).
+vim.api.nvim_create_autocmd('BufReadPost', {
+    group = vim.g.user.event,
+    callback = function(args)
+        local valid_line = vim.fn.line([['"]]) >= 1 and vim.fn.line([['"]]) < vim.fn.line('$')
+        local commit = vim.b[args.buf].filetype == 'commit'
+
+        if valid_line and not commit then
+            vim.cmd([[normal! g`"]])
+        end
+  end,
+})
 
 -- stylua: ignore
 local function SetKeymap()
