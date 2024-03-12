@@ -1,4 +1,4 @@
--- disable netrw at the very start of your init.lua
+-- disable netrw at the very start of init.lua, so nvim-tree takes care of file navigation
 vim.g.loaded_netrw = 1
 vim.g.loaded_netrwPlugin = 1
 
@@ -163,30 +163,36 @@ local function SetKeymap()
     vim.keymap.set('n', '<C-k>', '<C-w><C-k>', { desc = 'Move focus to the upper window' })
 
     local teleBuiltin = require('telescope.builtin')
-    vim.keymap.set('n', '<leader>ff'      , teleBuiltin.find_files             , { desc = 'File search' })
-    vim.keymap.set('n', '<leader>gr'      , teleBuiltin.grep_string            , { desc = 'Grep over current string' })
-    vim.keymap.set('n', '<leader>fg'      , teleBuiltin.live_grep              , { desc = 'Live grep' })
-    vim.keymap.set('n', '<leader>gs'      , teleBuiltin.git_status             , { desc = 'Telescope git status' })
-    vim.keymap.set('n', '<leader>bb'      , teleBuiltin.buffers                , { desc = 'Telescope buffers' })
-    vim.keymap.set('n', '<leader>qq'      , teleBuiltin.quickfix               , { desc = 'Telescope quickfix' })
+    local gitSigns = require('gitsigns.actions')
 
-    vim.keymap.set('n', '<leader>ss'      , teleBuiltin.lsp_document_symbols   , { desc = 'Telescope document symbols' })
-    vim.keymap.set('n', '<leader>sw'      , teleBuiltin.lsp_workspace_symbols  , { desc = 'Telescope workspace symbols' })
-    vim.keymap.set('n', 'gr'              , teleBuiltin.lsp_references         , { desc = 'Telescope references' })
-    vim.keymap.set('n', '<leader>dd'      , teleBuiltin.diagnostics            , { desc = 'Telescope references' })
-    vim.keymap.set('n', '<leader><leader>', teleBuiltin.resume                 , { desc = 'Resume last Telescope session' })
+    vim.keymap.set('n', '<leader>ff'      , teleBuiltin.find_files                 , { desc = 'File search' })
+    vim.keymap.set('n', '<leader>gr'      , teleBuiltin.grep_string                , { desc = 'Grep over current string' })
+    vim.keymap.set('n', '<leader>fg'      , teleBuiltin.live_grep                  , { desc = 'Live grep' })
+    vim.keymap.set('n', '<leader>bb'      , teleBuiltin.buffers                    , { desc = 'Telescope buffers' })
+    vim.keymap.set('n', '<leader>qq'      , teleBuiltin.quickfix                   , { desc = 'Telescope quickfix' })
 
-    vim.keymap.set('n', '<leader>th'      , '<cmd>Themery<cr>'                 , { desc = 'Themery' })
-    vim.keymap.set('n', '<leader>gg'      , '<cmd>G<cr><cmd>only<cr>'          , { desc = 'Fugitive' })
-    vim.keymap.set('n', '<leader>o'       , '<cmd>only<cr>'                    , { desc = 'Leave only current window' })
+    vim.keymap.set('n', '<leader>ss'      , teleBuiltin.lsp_document_symbols       , { desc = 'Telescope document symbols' })
+    vim.keymap.set('n', '<leader>sw'      , teleBuiltin.lsp_workspace_symbols      , { desc = 'Telescope workspace symbols' })
+    vim.keymap.set('n', 'gr'              , teleBuiltin.lsp_references             , { desc = 'Telescope references' })
+    vim.keymap.set('n', '<leader>dd'      , teleBuiltin.diagnostics                , { desc = 'Telescope references' })
+    vim.keymap.set('n', '<leader><leader>', teleBuiltin.resume                     , { desc = 'Resume last Telescope session' })
+
+    vim.keymap.set('n', '<leader>th'      , '<cmd>Themery<cr>'                     , { desc = 'Themery' })
+    vim.keymap.set('n', '<leader>o'       , vim.cmd.only                           , { desc = 'Leave only current window' })
     -- Plug 'p00f/clangd_extensions.nvim'
-    vim.keymap.set('n', '<leader>hh'      , '<cmd>ClangdSwitchSourceHeader<cr>', { desc = 'Switch cpp/h' })
-    vim.keymap.set('n', '<leader>rr'      , vim.lsp.buf.rename                 , { desc = 'Rename current symbol' })
-    vim.keymap.set('n', '<leader>ii'      , ToggleInlineHints                  , { desc = 'Toggle inlay hints' })
+    vim.keymap.set('n', '<leader>hh'      , '<cmd>ClangdSwitchSourceHeader<cr>'    , { desc = 'Switch cpp/h' })
+    vim.keymap.set('n', '<leader>rr'      , vim.lsp.buf.rename                     , { desc = 'Rename current symbol' })
+    vim.keymap.set('n', '<leader>ii'      , ToggleInlineHints                      , { desc = 'Toggle inlay hints' })
 
-    vim.keymap.set('n', '<C-K>'      , '<cmd>.ClangFormat<cr>'                 , { desc = 'Toggle inlay hints' })
-    vim.keymap.set('i', '<C-K>'      , '<C-O>:.ClangFormat<cr>'                , { desc = 'Toggle inlay hints' })
-    vim.keymap.set('v', '<C-K>'      , '<cmd>\'<,\'>ClangFormat<cr>'           , { desc = 'Toggle inlay hints' })
+    -- Git stuff
+    vim.keymap.set('n', '<leader>gg'      , '<cmd>0G<cr>'                          , { desc = 'Fugitive' })
+    vim.keymap.set('n', '<leader>gs'      , teleBuiltin.git_status                 , { desc = 'Telescope git status' })
+    vim.keymap.set('n', 'gS'              , gitSigns.stage_hunk                    , { desc = 'Stage current hunk' })
+    vim.keymap.set('n', 'gp'              , gitSigns.preview_hunk                  , { desc = 'Preview hunk' })
+
+    vim.keymap.set('n', '<C-K>'      , '<cmd>.ClangFormat<cr>'                     , { desc = 'Apply ClangFormat' })
+    vim.keymap.set('i', '<C-K>'      , '<C-O>:.ClangFormat<cr>'                    , { desc = 'Apply ClangFormat' })
+    vim.keymap.set('v', '<C-K>'      , '<cmd>\'<,\'>ClangFormat<cr>'               , { desc = 'Apply ClangFormat' })
 end
 
 SetKeymap()
