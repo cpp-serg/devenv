@@ -109,7 +109,38 @@ if not vim.loop.fs_stat(lazypath) then
 end
 vim.opt.rtp:prepend(lazypath)
 
-require('lazy').setup('plugins')
+local lazyConf = {
+    ui = not vim.g.have_nerd_font and {} or {
+        icons = {
+            cmd = " ",
+            config = '🛠',
+            event = "",
+            -- event = '📅',
+            ft = '📂',
+            init = '⚙',
+            import = " ",
+            keys = " ",
+            lazy = '💤 ',
+            loaded = "●",
+            not_loaded = "○",
+            plugin = '🔌',
+            runtime = '💻',
+            -- runtime = " ",
+            require = "󰢱 ",
+            source = " ",
+            start = "",
+            task = '📌',
+            list = {
+                "●",
+                "➜",
+                "★",
+                "‒",
+            },
+        },
+    }
+}
+
+require('lazy').setup('plugins',lazyConf)
 ------------------------------------------------------------
 
 -- -- From vim defaults.vim
