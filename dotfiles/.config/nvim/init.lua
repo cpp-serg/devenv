@@ -169,12 +169,13 @@ local function SetKeymap()
     --  See `:help vim.keymap.set()`
 
     -- Clear hlsearch on pressing <Esc> in normal mode
-    vim.keymap.set('n', '<Esc>', '<cmd>nohlsearch<CR>')
+    vim.keymap.set('n', '<Esc>', '<cmd>nohlsearch<cr>')
 
-    vim.keymap.set('n', '<C-n>', '<cmd>NvimTreeToggle<CR>')
+    vim.keymap.set('n', '<C-n>', '<cmd>NvimTreeToggle<cr>')
     vim.keymap.set('n', '<Tab>', '<cmd>e #<cr>')
-    vim.keymap.set('n', '<leader>x', '<cmd>bdelete<CR>')
-    vim.keymap.set('n', '<leader>X', '<cmd>bdelete!<CR>')
+    vim.keymap.set('n', '<leader>x', '<cmd>bdelete<cr>')
+    vim.keymap.set('n', '<leader>X', '<cmd>bdelete!<cr>')
+    vim.keymap.set('n', '<leader>bO', '<cmd>BufferLineCloseOthers<cr>')
 
     -- Diagnostic keymaps
     vim.keymap.set('n', '[d'       , vim.diagnostic.goto_prev , { desc = 'Go to previous [D]iagnostic message' })
@@ -183,10 +184,10 @@ local function SetKeymap()
     vim.keymap.set('n', '<leader>q', vim.diagnostic.setloclist, { desc = 'Open diagnostic [Q]uickfix list' })
 
     -- Disable arrow keys in normal mode
-    vim.keymap.set('n', '<left>', '<cmd>echo "Use h to move!!"<CR>')
-    vim.keymap.set('n', '<right>', '<cmd>echo "Use l to move!!"<CR>')
-    vim.keymap.set('n', '<up>', '<cmd>echo "Use k to move!!"<CR>')
-    vim.keymap.set('n', '<down>', '<cmd>echo "Use j to move!!"<CR>')
+    vim.keymap.set('n', '<left>', '<cmd>echo "Use h to move!!"<cr>')
+    vim.keymap.set('n', '<right>', '<cmd>echo "Use l to move!!"<cr>')
+    vim.keymap.set('n', '<up>', '<cmd>echo "Use k to move!!"<cr>')
+    vim.keymap.set('n', '<down>', '<cmd>echo "Use j to move!!"<cr>')
 
     -- Keybinds to make split navigation easier.
     --  Use CTRL+<hjkl> to switch between windows
