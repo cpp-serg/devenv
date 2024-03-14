@@ -88,11 +88,8 @@ vim.opt.foldcolumn = "auto"
 
 vim.opt.hlsearch = true
 
--- filetype plugin indent on
--- let g:airline_powerline_fonts = 1
--- let g:airline#extensions#tabline#enabled = 1
--- let g:airline#extensions#tagbar#enabled = 1
--- let g:airline#extensions#tagbar#flags = 'f'
+vim.opt.makeprg = 'ninja'
+
 
 -- [[ Install `lazy.nvim` plugin manager ]]
 --    See `:help lazy.nvim.txt` or https://github.com/folke/lazy.nvim for more info
@@ -161,6 +158,11 @@ vim.api.nvim_create_autocmd('BufReadPost', {
   end,
 })
 
+local function ToggleLinesOnOff()
+    vim.wo.number = not vim.wo.number
+    vim.wo.relativenumber = not vim.wo.relativenumber
+end
+
 -- stylua: ignore
 local function SetKeymap()
     -- [[ Basic Keymaps ]]
@@ -170,7 +172,9 @@ local function SetKeymap()
     vim.keymap.set('n', '<Esc>', '<cmd>nohlsearch<CR>')
 
     vim.keymap.set('n', '<C-n>', '<cmd>NvimTreeToggle<CR>')
-    vim.keymap.set('n', '<Tab>', '<cmd>tabn<CR>')
+    vim.keymap.set('n', '<Tab>', '<cmd>e #<cr>')
+    vim.keymap.set('n', '<leader>x', '<cmd>bdelete<CR>')
+    vim.keymap.set('n', '<leader>X', '<cmd>bdelete!<CR>')
 
     -- Diagnostic keymaps
     vim.keymap.set('n', '[d'       , vim.diagnostic.goto_prev , { desc = 'Go to previous [D]iagnostic message' })
@@ -221,9 +225,14 @@ local function SetKeymap()
     vim.keymap.set('n', 'gS'              , gitSigns.stage_hunk                    , { desc = 'Stage current hunk' })
     vim.keymap.set('n', 'gp'              , gitSigns.preview_hunk                  , { desc = 'Preview hunk' })
 
-    vim.keymap.set('n', '<C-K>'      , '<cmd>.ClangFormat<cr>'                     , { desc = 'Apply ClangFormat' })
-    vim.keymap.set('i', '<C-K>'      , '<C-O>:.ClangFormat<cr>'                    , { desc = 'Apply ClangFormat' })
-    vim.keymap.set('v', '<C-K>'      , '<cmd>\'<,\'>ClangFormat<cr>'               , { desc = 'Apply ClangFormat' })
+    vim.keymap.set('n', '<C-K>'           , '<cmd>.ClangFormat<cr>'                , { desc = 'Apply ClangFormat' })
+    vim.keymap.set('i', '<C-K>'           , '<C-O>:.ClangFormat<cr>'               , { desc = 'Apply ClangFormat' })
+    vim.keymap.set('v', '<C-K>'           , '<cmd>\'<,\'>ClangFormat<cr>'          , { desc = 'Apply ClangFormat' })
+
+    vim.keymap.set('n', '<leader>ll'      , ToggleLinesOnOff                       , { desc = 'Toggle lines on off' })
+    vim.keymap.set('n', '<leader>lr'      , '<cmd>set relativenumber!<cr>'         , { desc = 'Toggle relativenuber' })
+    vim.keymap.set('n', '<leader>`'       , '<cmd>cn<cr>'                          , { desc = 'Next error' })
+    vim.keymap.set('n', '<leader>m'       , '<cmd>make -C build/debug<cr>'         , { desc = 'Next error' })
 end
 
 SetKeymap()
