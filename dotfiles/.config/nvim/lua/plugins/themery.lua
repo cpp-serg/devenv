@@ -6,6 +6,7 @@ return {
         'catppuccin/nvim',
         'folke/tokyonight.nvim',
         'rose-pine/neovim',
+        'rebelot/kanagawa.nvim'
     },
     config = function()
         require('themery').setup({
@@ -15,18 +16,19 @@ return {
                 'catppuccin-latte',
                 'tokyonight-day',
                 'rose-pine-dawn',
+                'kanagawa-lotus',
                 {
                     name = 'Gruvbox light',
                     colorscheme = 'gruvbox',
                     before = [[vim.opt.background = "light" ]],
                 },
+                -----------------------------------------------------------------------------------------
+                --- Dark themes
                 {
                     name = 'Gruvbox dark',
                     colorscheme = 'gruvbox',
                     before = [[ vim.opt.background = "dark" ]],
                 },
-                -----------------------------------------------------------------------------------------
-                --- Dark themes
                 'monokai-pro-default',
                 'monokai-pro-classic',
                 'monokai-pro-machine',
@@ -41,6 +43,8 @@ return {
                 'tokyonight-storm',
                 'rose-pine-main',
                 'rose-pine-moon',
+                'kanagawa-dragon',
+                'kanagawa-wave',
             }, -- Your list of installed colorschemes
             themeConfigFile = '~/.config/nvim/lua/settings/theme.lua', -- Described below
             livePreview = true, -- Apply theme while browsing. Default to true.

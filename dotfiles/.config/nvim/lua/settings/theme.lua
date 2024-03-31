@@ -3,5 +3,5 @@
 vim.opt.background = "dark"
 
 vim.cmd("colorscheme gruvbox")
-vim.g.theme_id = 5
+vim.g.theme_id = 6
 -- end themery block

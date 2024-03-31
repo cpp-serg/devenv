@@ -17,7 +17,7 @@ local root_files = {
 
 -- TODO: add clang-tidy to on_atach with clangd
 return {
-	cmd = { "clangd22",
+	cmd = { "clangd",
 		"--all-scopes-completion",
 		"--background-index",
 		"--clang-tidy",

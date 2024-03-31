@@ -233,7 +233,7 @@ local function SetKeymap()
     vim.keymap.set('n', '<leader>ll'      , ToggleLinesOnOff                       , { desc = 'Toggle lines on off' })
     vim.keymap.set('n', '<leader>lr'      , '<cmd>set relativenumber!<cr>'         , { desc = 'Toggle relativenuber' })
     vim.keymap.set('n', '<leader>`'       , '<cmd>cn<cr>'                          , { desc = 'Next error' })
-    vim.keymap.set('n', '<leader>m'       , '<cmd>make -C build/debug<cr>'         , { desc = 'Next error' })
+    vim.keymap.set('n', '<leader>m'       , '<cmd>wa<cr><cmd>make -C build/current<cr>'         , { desc = 'Next error' })
 end
 
 SetKeymap()

@@ -160,8 +160,10 @@ return {
             --        For example, to see the options for `lua_ls`, you could go to: https://luals.github.io/wiki/settings/
             local servers = {
                 clangd = {
+                    mason = false,
                     cmd = {
-                        "clangd",
+                        "/opt/llvm-18/bin/clangd",
+                        -- "clangd",
                         "--background-index",
                         "-j=18",     -- number of workers @TODO read system configuration
                         "--all-scopes-completion",
@@ -234,6 +236,7 @@ return {
             -- You can add other tools here that you want Mason to install
             -- for you, so that they are available from within Neovim.
             local ensure_installed = vim.tbl_keys(servers or {})
+            -- local ensure_installed =  {}
             vim.list_extend(ensure_installed, {
                 'stylua', -- Used to format lua code
             })
