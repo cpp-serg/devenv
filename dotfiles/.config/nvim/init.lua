@@ -200,6 +200,7 @@ local function SetKeymap()
 
     local teleBuiltin = require('telescope.builtin')
     local gitSigns = require('gitsigns.actions')
+    local harpoonMarks = require('harpoon.mark')
 
     vim.keymap.set('n', '<leader>ff'      , teleBuiltin.find_files                 , { desc = 'File search' })
     vim.keymap.set('n', '<leader>gr'      , teleBuiltin.grep_string                , { desc = 'Grep over current string' })
@@ -234,6 +235,9 @@ local function SetKeymap()
     vim.keymap.set('n', '<leader>lr'      , '<cmd>set relativenumber!<cr>'         , { desc = 'Toggle relativenuber' })
     vim.keymap.set('n', '<leader>`'       , '<cmd>cn<cr>'                          , { desc = 'Next error' })
     vim.keymap.set('n', '<leader>m'       , '<cmd>wa<cr><cmd>make -C build/current<cr>'         , { desc = 'Next error' })
+
+    vim.keymap.set('n', '<leader>ha'       , harpoonMarks.add_file                 , { desc = 'Harpoon add file' })
+    vim.keymap.set('n', '<leader>hl'       , '<cmd>Telescope harpoon marks<cr>'    , { desc = 'Harpoon telescope' })
 end
 
 SetKeymap()

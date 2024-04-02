@@ -237,6 +237,7 @@ return {
             -- for you, so that they are available from within Neovim.
             local ensure_installed = vim.tbl_keys(servers or {})
             -- local ensure_installed =  {}
+            ensure_installed['clangd'] = nil -- We use the custom clangd configuration above
             vim.list_extend(ensure_installed, {
                 'stylua', -- Used to format lua code
             })
