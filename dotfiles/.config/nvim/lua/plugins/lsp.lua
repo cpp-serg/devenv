@@ -165,7 +165,7 @@ return {
                         "/opt/llvm-18/bin/clangd",
                         -- "clangd",
                         "--background-index",
-                        "-j=18",     -- number of workers @TODO read system configuration
+                        string.format("-j=%d",#vim.loop.cpu_info()),
                         "--all-scopes-completion",
                         -- "--clang-tidy",
                         -- "--compile_args_from=filesystem", -- lsp-> does not come from compie_commands.json
