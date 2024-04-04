@@ -237,8 +237,11 @@ local function SetKeymap()
     vim.keymap.set('n', '<leader>m'       , '<cmd>wa<cr><cmd>make -C build/current<cr>', { desc = 'Build current config' })
     vim.keymap.set('n', '<leader>M'       , '<cmd>wa<cr><cmd>terminal ./build.sh<cr>'  , { desc = 'Build current config in terminal' })
 
-    vim.keymap.set('n', '<leader>ha'       , harpoonMarks.add_file                     , { desc = 'Harpoon add file' })
-    vim.keymap.set('n', '<leader>hl'       , '<cmd>Telescope harpoon marks<cr>'        , { desc = 'Harpoon telescope' })
+    vim.keymap.set('n', '<leader>ha'      , harpoonMarks.add_file                      , { desc = 'Harpoon add file' })
+    vim.keymap.set('n', '<leader>hl'      , '<cmd>Telescope harpoon marks<cr>'         , { desc = 'Harpoon telescope' })
+
+    vim.keymap.set('n', '<leader>tt'      , '<cmd>TSContextToggle<cr>'                 , { desc = 'Toggle Tresitter context' })
+
 end
 
 SetKeymap()

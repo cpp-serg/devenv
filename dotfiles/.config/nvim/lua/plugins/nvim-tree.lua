@@ -4,6 +4,10 @@ return {
         { 'nvim-tree/nvim-web-devicons', enabled = vim.g.have_nerd_font },
     },
     opts = {
+        update_focused_file = {
+            enable = true,
+            update_cwd = false,
+        },
         view = {
             width = 20,
             adaptive_size = true,
