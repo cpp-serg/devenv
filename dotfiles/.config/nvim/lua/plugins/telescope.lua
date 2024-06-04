@@ -35,9 +35,23 @@ return {
             defaults = {
                 layout = 'vertical',
                 layout_config={width=0.99,height=0.99},
+                -- initial_mode='normal',
             },
             pickers = {
                 lsp_code_actions = { theme = "cursor" },
+                lsp_references = {
+                    show_line = false,
+                },
+                grep_string = {
+                    show_line = false,
+                },
+                buffers = {
+                    -- show_all_buffers = false,
+                    sort_lastused = true,
+                    mappings = {
+                        i = { ['<c-K>'] = require('telescope.actions').delete_buffer},
+                    },
+                },
             },
             -- You can put your default mappings / updates / etc. in here
         --  All the info you're looking for is in `:help telescope.setup()`

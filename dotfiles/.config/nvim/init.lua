@@ -79,6 +79,17 @@ vim.api.nvim_create_autocmd('TextYankPost', {
     end,
 })
 
+-- Fix user type errors
+vim.api.nvim_create_user_command('Q','q',{ desc = 'Quit'})
+vim.api.nvim_create_user_command('Qa','qa',{ desc = 'Quit all'})
+vim.api.nvim_create_user_command('W','w',{ desc = 'Write'})
+vim.api.nvim_create_user_command('Wq','wq',{ desc = 'Write and quit'})
+vim.api.nvim_create_user_command('Wa','wa',{ desc = 'Write all'})
+vim.api.nvim_create_user_command('Wqa','wqa',{ desc = 'Write all and quit'})
+vim.api.nvim_create_user_command('WQ','wq',{ desc = 'Write and quit'})
+vim.api.nvim_create_user_command('WQa','wqa',{ desc = 'Write all and quit'})
+
+
 vim.opt.foldexpr = "v:lua.vim.treesitter.foldexpr()"
 vim.opt.foldtext = "v:lua.vim.treesitter.foldtext()"
 
@@ -167,6 +178,7 @@ end
 local function SetKeymap()
     -- [[ Basic Keymaps ]]
     --  See `:help vim.keymap.set()`
+    vim.keymap.set('n', '<leader>HH'      , '<cmd>e ~/.config/nvim/init.lua<cr>'    , { desc = 'Edit nvim init' })
 
     -- Clear hlsearch on pressing <Esc> in normal mode
     vim.keymap.set('n', '<Esc>', '<cmd>nohlsearch<cr>')
@@ -210,8 +222,10 @@ local function SetKeymap()
 
     vim.keymap.set('n', '<leader>ss'      , teleBuiltin.lsp_document_symbols           , { desc = 'Telescope document symbols' })
     vim.keymap.set('n', '<leader>sw'      , teleBuiltin.lsp_workspace_symbols          , { desc = 'Telescope workspace symbols' })
-    vim.keymap.set('n', 'gr'              , teleBuiltin.lsp_references                 , { desc = 'Telescope references' })
+    vim.keymap.set('n', 'gR'              , teleBuiltin.lsp_references                 , { desc = 'Telescope references' })
+    vim.keymap.set('n', 'gr'              , '<cmd>Glance references<cr>'               , { desc = 'Glance references' })
     vim.keymap.set('n', '<leader>dd'      , teleBuiltin.diagnostics                    , { desc = 'Telescope references' })
+    vim.keymap.set('n', '<leader>gb'      , teleBuiltin.git_branches                   , { desc = 'Telescope references' })
     vim.keymap.set('n', '<leader><leader>', teleBuiltin.resume                         , { desc = 'Resume last Telescope session' })
 
     vim.keymap.set('n', '<leader>th'      , '<cmd>Themery<cr>'                         , { desc = 'Themery' })

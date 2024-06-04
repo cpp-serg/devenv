@@ -67,7 +67,7 @@ return {
                     map('gd', require('telescope.builtin').lsp_definitions, '[G]oto [D]efinition')
 
                     -- Find references for the word under your cursor.
-                    map('gr', require('telescope.builtin').lsp_references, '[G]oto [R]eferences')
+                    -- map('gr', require('telescope.builtin').lsp_references, '[G]oto [R]eferences')
 
                     -- Jump to the implementation of the word under your cursor.
                     --  Useful when your language has ways of declaring types without an actual implementation.
@@ -112,7 +112,7 @@ return {
 
                     -- Opens a popup that displays documentation about the word under your cursor
                     --  See `:help K` for why this keymap
-                    map('K', vim.lsp.buf.hover, 'Hover Documentation')
+                    -- map('K', vim.lsp.buf.hover, 'Hover Documentation')
 
                     -- WARN: This is not Goto Definition, this is Goto Declaration.
                     --  For example, in C this would take you to the header
@@ -159,11 +159,15 @@ return {
             --  - settings (table): Override the default settings passed when initializing the server.
             --        For example, to see the options for `lua_ls`, you could go to: https://luals.github.io/wiki/settings/
             local servers = {
+                jinja_lsp={
+                    filetypes = {"jinja"},
+                },
                 clangd = {
                     mason = false,
                     cmd = {
                         "/opt/llvm-18/bin/clangd",
                         -- "clangd",
+                        "--offset-encoding=utf-16",
                         "--background-index",
                         string.format("-j=%d",#vim.loop.cpu_info()),
                         "--all-scopes-completion",

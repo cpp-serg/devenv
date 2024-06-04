@@ -1,4 +1,4 @@
-[inlcude]
+[include]
     path=/home/spastukhov/.config/git/mocha.gitconfig
 
 [credential]
@@ -11,7 +11,7 @@
     loggraph ="!git logpretty --graph"
     #lg1 ="!git loggraph --topo-order"
     lg1 ="!git loggraph"
-    lga ="!git lg1 --all"
+    lga ="!git lg1 --exclude='refs/prefetch/*' --all"
     bt ="!git lga --simplify-by-decoration"
     lg2 = log --graph --abbrev-commit --decorate --format=format:'%C(bold blue)%h%C(reset) - %C(bold cyan)%aD%C(reset) %C(bold green)(%ar)%C(reset)%C(bold yellow)%d%C(reset)%n''          %C(white)%s%C(reset) %C(dim white)- %an%C(reset)' --all
     lg = !git lg1
@@ -22,11 +22,12 @@
 [interactive]
     diffFilter = delta --color-only --features=interactive
 [delta]
+    features = interactive
+    features = catppuccin-mocha
     features = decorations
-    #features = catppuccin-mocha
 
 [delta "interactive"]
-    keep-plus-minus-markers = false
+    keep-plus-minus-markers = true
 
 [delta "decorations"]
     commit-decoration-style = blue ol
@@ -36,10 +37,11 @@
     hunk-header-file-style = red
     hunk-header-line-number-style = "#067a00"
     hunk-header-style = file line-number syntax
-    syntax-theme = gruvbox-dark
+    # syntax-theme = gruvbox-dark
     #syntax-theme = "Monokai Extended"
     #syntax-theme = GitHub
-    #syntax-theme = gruvbox-dark
+    syntax-theme = gruvbox-dark
+    keep-plus-minus-markers = true
 [gc]
     autoDetach = false
 [merge]
