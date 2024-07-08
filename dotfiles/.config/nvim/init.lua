@@ -174,6 +174,15 @@ local function ToggleLinesOnOff()
     vim.wo.relativenumber = not vim.wo.relativenumber
 end
 
+local function FormatCurrentLine()
+    vim.lsp.buf.format({
+        range = {
+            ["start"] = { vim.fn.line('.'), 1 },
+            ["end"]   = { vim.fn.line('.'), 1 },
+        }
+    })
+end
+
 -- stylua: ignore
 local function SetKeymap()
     -- [[ Basic Keymaps ]]
@@ -241,9 +250,11 @@ local function SetKeymap()
     vim.keymap.set('n', 'gS'              , gitSigns.stage_hunk                        , { desc = 'Stage current hunk' })
     vim.keymap.set('n', 'gp'              , gitSigns.preview_hunk                      , { desc = 'Preview hunk' })
 
-    vim.keymap.set('n', '<C-K>'           , '<cmd>.ClangFormat<cr>'                    , { desc = 'Apply ClangFormat' })
-    vim.keymap.set('i', '<C-K>'           , '<C-O>:.ClangFormat<cr>'                   , { desc = 'Apply ClangFormat' })
-    vim.keymap.set('v', '<C-K>'           , '<cmd>\'<,\'>ClangFormat<cr>'              , { desc = 'Apply ClangFormat' })
+    -- vim.keymap.set('n', '<C-K>'           , '<cmd>.ClangFormat<cr>'                    , { desc = 'Apply ClangFormat' })
+    -- vim.keymap.set('i', '<C-K>'           , '<C-O>:.ClangFormat<cr>'                   , { desc = 'Apply ClangFormat' })
+    -- vim.keymap.set('v', '<C-K>'           , '<cmd>\'<,\'>ClangFormat<cr>'              , { desc = 'Apply ClangFormat' })
+    vim.keymap.set('n', '<C-K>'           , FormatCurrentLine                         , { desc = 'Apply ClangFormat' })
+    vim.keymap.set('v', '<C-K>'           , vim.lsp.buf.format                         , { desc = 'Apply ClangFormat' })
 
     vim.keymap.set('n', '<leader>ll'      , ToggleLinesOnOff                           , { desc = 'Toggle lines on off' })
     vim.keymap.set('n', '<leader>lr'      , '<cmd>set relativenumber!<cr>'             , { desc = 'Toggle relativenuber' })
