@@ -1,3 +1,15 @@
 [submodule "dotfiles/.tmux/plugins/tpm"]
 	path = dotfiles/.tmux/plugins/tpm
 	url = https://github.com/tmux-plugins/tpm
+[submodule "dotfiles/zsh_custom/plugins/zsh-autosuggestions"]
+	path = dotfiles/zsh_custom/plugins/zsh-autosuggestions
+	url = https://github.com/zsh-users/zsh-autosuggestions.git
+[submodule "dotfiles/zsh_custom/plugins/zsh-completions"]
+	path = dotfiles/zsh_custom/plugins/zsh-completions
+	url = https://github.com/zsh-users/zsh-completions
+[submodule "dotfiles/zsh_custom/plugins/zsh-peco-history"]
+	path = dotfiles/zsh_custom/plugins/zsh-peco-history
+	url = https://github.com/jimeh/zsh-peco-history.git
+[submodule "dotfiles/zsh_custom/plugins/zsh-syntax-highlighting"]
+	path = dotfiles/zsh_custom/plugins/zsh-syntax-highlighting
+	url = https://github.com/zsh-users/zsh-syntax-highlighting.git

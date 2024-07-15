@@ -1,25 +1,59 @@
-#10.20.4.129 If you come from bash you might have to change your $PATH.
-# export PATH=$HOME/bin:/usr/local/bin:$PATH
-export PATH=$PATH:/opt/tools
-export PATH=$PATH:/opt/llvm-18/bin
-export PATH=$PATH:/opt/ccache/bin
-export PATH=$PATH:/home/spastukhov/.local/bin
-export PATH=${PATH}:/opt/valgrind/bin
-export PATH=${PATH}:/opt/asn1c/bin
-export PATH=/home/spastukhov/.local/bin:$PATH
-export MANPATH=$MANPATH:/opt/tmux/share/man
-export MANPATH=$MANPATH:/opt/nvim/share/man
-export MANPATH=$MANPATH:/opt/asn1c/share/man
-export MANPATH="$MANPATH:/opt/rh/gcc-toolset-13/root/usr/share/man"
-export MANPATH="$MANPATH:/opt/llvm-18/share/man"
-export PATH=$PATH:/home/spastukhov/go/bin
+DEVENV_ROOT="${HOME}/devenv"
+DOTFILES_ROOT="${DEVENV_ROOT}/dotfiles"
+
+IS_SP_PRIVATE_HOST=false
+test -f ${HOME}/.sp-private-host && IS_SP_PRIVATE_HOST=true
+
+TOOL_ROOTS=(
+    /opt/tools
+    /opt/llvm-18
+    /opt/ccache
+    ${HOME}/.local
+    /opt/valgrind
+    /opt/asn1c
+    /opt/tmux
+    /opt/nvim
+    /opt/ripgrep
+    ${HOME}/go
+)
+
+ADDED_PATHS=""
+ADDED_MANPATHS=""
+for tool in "${TOOL_ROOTS[@]}" ; do
+    if [ -d "${tool}/bin" ] ; then
+        ADDED_PATHS="${ADDED_PATHS}:${tool}/bin"
+        if [ -d "${tool}/man" ] ; then
+            ADDED_MANPATHS="${ADDED_MANPATHS}:${tool}/man"
+        elif [ -d "${tool}/doc" ] ; then
+            ADDED_MANPATHS="${ADDED_MANPATHS}:${tool}/doc"
+        elif [ -d "${tool}/share/man" ] ; then
+            ADDED_MANPATHS="${ADDED_MANPATHS}:${tool}/share/man"
+        fi
+    elif [ -d "${tool}" ]; then
+        ADDED_PATHS="${ADDED_PATHS}:${tool}"
+    fi
+done
+
+if [ ! -z "${ADDED_PATHS}" ] ; then
+    export PATH=$PATH:${ADDED_PATHS}
+fi
+
+if [ ! -z "${ADDED_MANPATHS}" ] ; then
+    export MANPATH=${MANPATH}:${ADDED_MANPATHS}
+fi
+
+if [ -d "/opt/rh/gcc-toolset-13/root/usr/share/man" ] ; then
+    export MANPATH="$MANPATH:/opt/rh/gcc-toolset-13/root/usr/share/man"
+fi
 export PYTHONSTARTUP=~/.config/.pythonrc
 
-export PATH="$PATH:/opt/ripgrep"
-export MANPATH="$MANPATH:/opt/ripgrep/doc"
-. "$HOME/.cargo/env"
-export RIPGREP_CONFIG_PATH=~/.ripgreprc
+source "${HOME}/.cargo/env"
+
+if [ -f ~/.ripgreprc ] ; then
+    export RIPGREP_CONFIG_PATH=~/.ripgreprc
+fi
 export DELTA_FEATURES=+side-by-side
+
 export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/usr/local/python-3.11.3/lib/"
 
 # Path to your oh-my-zsh installation.
@@ -29,8 +63,11 @@ export ZSH="$HOME/.oh-my-zsh"
 # load a random theme each time oh-my-zsh is loaded, in which case,
 # to know which specific one was loaded, run: echo $RANDOM_THEME
 # See https://github.com/ohmyzsh/ohmyzsh/wiki/Themes
-ZSH_THEME="robbyrussell"
-# ZSH_THEME="amuse" # for helper envs
+if $IS_SP_PRIVATE_HOST; then
+    ZSH_THEME="robbyrussell"
+else
+    ZSH_THEME="amuse"
+fi
 
 # Set list of themes to pick from when loading at random
 # Setting this variable when ZSH_THEME=random will cause zsh to load
@@ -87,14 +124,15 @@ HIST_STAMPS="yyyy-mm-dd"
 # Would you like to use another custom folder than $ZSH/custom?
 # ZSH_CUSTOM=/path/to/new-custom-folder
 
-# Which plugins would you like to load?
-# Standard plugins can be found in $ZSH/plugins/
-# Custom plugins may be added to $ZSH_CUSTOM/plugins/
-# Example format: plugins=(rails git textmate ruby lighthouse)
-# Add wisely, as too many plugins slow down shell startup.
 #plugins=(git yum scp)
 #plugins=(git cp docker docker-compose yum dnf sudo npm node pip pm2 tmux zsh-autosuggestions zsh-syntax-highlighting zsh-peco-history ripgrep)
-plugins=(git cp docker docker-compose yum dnf npm node pip pm2 zsh-autosuggestions zsh-syntax-highlighting zsh-peco-history zsh-completions ripgrep)
+plugins=(git cp docker docker-compose yum dnf npm node pip pm2 ripgrep)
+
+ZSH_CUSTOM=${DOTFILES_ROOT}/zsh_custom
+
+for custom_plug in $(ls ${ZSH_CUSTOM}/plugins); do
+    plugins+=(${custom_plug})
+done
 
 HISTSIZE=250000
 SAVEHIST=100000
@@ -166,10 +204,6 @@ function ddf {
     delta $1 ~/jpu-tests-sp/helpers/core/testPython/$1
 }
 
-function cgd {
-    git diff 44862c30 $1
-}
-
 function cleanPatch
 {
     sed "s/@@.*@@/@@@@/g" $1 | sed "s/index [.a-f0-9]*/index xx xx/g"
@@ -210,18 +244,16 @@ function ccc
 
 zstyle -e ':completion:*:(mcssh):hosts' hosts 'reply=(${=${${(f)"$(cat {/etc/ssh_,~/.ssh/known_}hosts(|2)(N) /dev/null)"}%%[# ]*}//,/ })'
 
-source ~/resilienceFns.sh
+if [ -f ~/resilienceFns.sh ] ; then
+    source ~/resilienceFns.sh
+fi
 
-alias 111='ssh root@10.20.4.111'
-alias 137='ssh root@10.20.4.137'
-alias 141='ssh root@10.20.4.141'
-alias 143='ssh root@10.20.4.143'
-alias 145='ssh root@10.20.4.145'
+if [ -d /home/spastukhov/build-tools/vcpkg ] ; then
+    export VCPKG_ROOT=/home/spastukhov/build-tools/vcpkg
+    export PATH=$PATH:${VCPKG_ROOT}
+    autoload bashcompinit
+    bashcompinit
+    source ${VCPKG_ROOT}/scripts/vcpkg_completion.zsh
+fi
 
-export VCPKG_ROOT=/home/spastukhov/build-tools/vcpkg
-export PATH=$PATH:${VCPKG_ROOT}
-
-autoload bashcompinit
-bashcompinit
-source ${VCPKG_ROOT}/scripts/vcpkg_completion.zsh
 
