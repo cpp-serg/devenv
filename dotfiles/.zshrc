@@ -1,8 +1,24 @@
 DEVENV_ROOT="${HOME}/devenv"
 DOTFILES_ROOT="${DEVENV_ROOT}/dotfiles"
 
-IS_SP_PRIVATE_HOST=false
-test -f ${HOME}/.sp-private-host && IS_SP_PRIVATE_HOST=true
+function HaveTool {
+    if (( $+commands[$1] )); then
+        echo true
+    else
+        echo false
+    fi
+}
+
+function HaveFile {
+    if [[ -f $1 ]]; then
+        echo true
+    else
+        echo false
+    fi
+}
+
+
+IS_SP_PRIVATE_HOST=$(HaveFile ${HOME}/.sp-private-host)
 
 TOOL_ROOTS=(
     /opt/tools
@@ -15,46 +31,59 @@ TOOL_ROOTS=(
     /opt/nvim
     /opt/ripgrep
     ${HOME}/go
+    /opt/go
 )
+
 
 ADDED_PATHS=""
 ADDED_MANPATHS=""
 for tool in "${TOOL_ROOTS[@]}" ; do
-    if [ -d "${tool}/bin" ] ; then
+    if [[ -d "${tool}/bin" ]] ; then
         ADDED_PATHS="${ADDED_PATHS}:${tool}/bin"
-        if [ -d "${tool}/man" ] ; then
+        if [[ -d "${tool}/man" ]] ; then
             ADDED_MANPATHS="${ADDED_MANPATHS}:${tool}/man"
-        elif [ -d "${tool}/doc" ] ; then
+        elif [[ -d "${tool}/doc" ]] ; then
             ADDED_MANPATHS="${ADDED_MANPATHS}:${tool}/doc"
-        elif [ -d "${tool}/share/man" ] ; then
+        elif [[ -d "${tool}/share/man" ]] ; then
             ADDED_MANPATHS="${ADDED_MANPATHS}:${tool}/share/man"
         fi
-    elif [ -d "${tool}" ]; then
+    elif [[ -d "${tool}" ]]; then
         ADDED_PATHS="${ADDED_PATHS}:${tool}"
     fi
 done
 
-if [ ! -z "${ADDED_PATHS}" ] ; then
+if [[ ! -z "${ADDED_PATHS}" ]] ; then
     export PATH=$PATH:${ADDED_PATHS}
 fi
 
-if [ ! -z "${ADDED_MANPATHS}" ] ; then
+if [[ ! -z "${ADDED_MANPATHS}" ]] ; then
     export MANPATH=${MANPATH}:${ADDED_MANPATHS}
 fi
 
-if [ -d "/opt/rh/gcc-toolset-13/root/usr/share/man" ] ; then
+# Must be after ADDED_PATHS stuff
+HAVE_GIT=$(HaveTool git)
+HAVE_FZF=$(HaveTool fzf)
+HAVE_RIPGREP=$(HaveTool rg)
+HAVE_FD=$(HaveTool fd)
+HAVE_GO=$(HaveTool go)
+HAVE_DOCKER=$(HaveTool docker)
+HAVE_RUST=$(HaveTool rustc)
+HAVE_DELTA=$(HaveTool delta)
+HAVE_NODE=$(HaveTool node)
+HAVE_TMUX=$(HaveTool tmux)
+HAVE_LAZYGIT=$(HaveTool lazygit)
+
+if [[ -d "/opt/rh/gcc-toolset-13/root/usr/share/man" ]] ; then
     export MANPATH="$MANPATH:/opt/rh/gcc-toolset-13/root/usr/share/man"
 fi
-export PYTHONSTARTUP=~/.config/.pythonrc
 
-source "${HOME}/.cargo/env"
+[[ -f ~/.config/.pythonrc ]] && export PYTHONSTARTUP=~/.config/.pythonrc
+[[ -f  ${HOME}/.cargo/env ]] && source "${HOME}/.cargo/env"
+[[ -f ~/.ripgreprc        ]] && export RIPGREP_CONFIG_PATH=~/.ripgreprc
 
-if [ -f ~/.ripgreprc ] ; then
-    export RIPGREP_CONFIG_PATH=~/.ripgreprc
-fi
-export DELTA_FEATURES=+side-by-side
+$HAVE_DELTA && export DELTA_FEATURES=+side-by-side
 
-export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/usr/local/python-3.11.3/lib/"
+#export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/usr/local/python-3.11.3/lib/"
 
 # Path to your oh-my-zsh installation.
 export ZSH="$HOME/.oh-my-zsh"
@@ -123,10 +152,17 @@ HIST_STAMPS="yyyy-mm-dd"
 
 # Would you like to use another custom folder than $ZSH/custom?
 # ZSH_CUSTOM=/path/to/new-custom-folder
+plugins=(cp yum dnf sudo pip)
 
-#plugins=(git yum scp)
-#plugins=(git cp docker docker-compose yum dnf sudo npm node pip pm2 tmux zsh-autosuggestions zsh-syntax-highlighting zsh-peco-history ripgrep)
-plugins=(git cp docker docker-compose yum dnf npm node pip pm2 ripgrep)
+$HAVE_FZF && plugins+=(fzf)
+$HAVE_GIT && plugins+=(git)
+$HAVE_GO && plugins+=(golang)
+$HAVE_DOCKER && plugins+=(docker docker-compose)
+$HAVE_RUST && plugins+=(rust)
+$HAVE_NODE && plugins+=(node npm)
+$HAVE_RIPGREP && plugins+=(ripgrep)
+$HAVE_FD && plugins+=(fd)
+$HAVE_TMUX && plugins+=(tmux)
 
 ZSH_CUSTOM=${DOTFILES_ROOT}/zsh_custom
 
@@ -141,6 +177,12 @@ source $ZSH/lib/history.zsh
 setopt HIST_EXPIRE_DUPS_FIRST
 setopt HIST_FIND_NO_DUPS
 fpath+=${ZSH_CUSTOM:-${ZSH:-~/.oh-my-zsh}/custom}/plugins/zsh-completions/src
+if $HAVE_FZF; then
+    FZF_BASE=/home/spastukhov/install_soft/fzf/
+    export FZF_DEFAULT_OPTS='--height=~90% --ansi --preview "bat --color=always --line-range :500 {}" --preview-window=right:wrap'
+    #export FZF_DEFAULT_OPTS='--ansi --preview "bat --color=always --style=header,grid --line-range :500 {}" --preview-window=down:3:wrap'
+    #export FZF_DEFAULT_OPTS='--height 40% --layout=reverse --border --ansi --preview "bat --color=always --style=header,grid --line-range :500 {}" --preview-window=down:3:wrap'
+fi
 source $ZSH/oh-my-zsh.sh
 
 export ZSH_AUTOSUGGEST_STRATEGY=(history completion)
@@ -171,27 +213,32 @@ export LANG=en_US.UTF-8
 # alias ohmyzsh="mate ~/.oh-my-zsh"
 export EDITOR='nvim'
 CORRECT_IGNORE_FILE='release'
+
 alias please='sudo $(fc -ln -1)'
 alias gdb='/opt/rh/gcc-toolset-13/root/usr/bin/gdb'
-alias glg='git lg'
-alias glgm='git lg2'
-alias glga='git lga'
-alias glgam='git lga2'
-alias gbt='git bt'
-alias gdh='gd HEAD'
-alias gd~='gd HEAD~'
-alias lg='lazygit'
+
+if $HAVE_GIT; then
+    alias glg='git lg'
+    alias glgm='git lg2'
+    alias glga='git lga'
+    alias glgam='git lga2'
+    alias gbt='git bt'
+    alias gdh='gd HEAD'
+    alias gd~='gd HEAD~'
+fi
+
+$HAVE_LAZYGIT && alias lg='lazygit'
+
+alias vimdiff='nvim -d'
 #unset '_comps[delta]'
 _comps[delta]=_delta
 
 function sg {
- rg $* | delta
+    rg $* | delta
 }
 
 compdef _gnu_generic build.sh
 compdef _gnu_generic asn1c
-
-CORRECT_IGNORE_FILE='release'
 
 function changeTps {
     VER=$1
@@ -224,17 +271,25 @@ function jenk
 function jenkapi
 {
     jenk_serv=http://jenkinsil.jpu.io
-    jenk -q -O - ${jenk_serv}/${1}/api/json
+    jenk -q -O - ${jenk_serv}/${1}/api/json | jq
 }
+
+MASTER_ROOT=job/pente-ggsn
+MVNO_ROOT=view/%20%20%20%20%20MVNO%20Official%20Builds/job/pente-ggsn-MVNO
+PATCHES_ROOT=view/%20%20%20%20%20Patch%20builds/job/pente-ggsn_patch
+TAGS_ROOT=view/%20%20%20%20Dev%20Builds/job/pente-ggsn_tag
 
 function jtags
 {
-    jenkapi view/%20%20Dev%20Builds/job/pente-ggsn_tag/view/tags | jq '.jobs[].url' | sed -nE 's/.*job\/([0-9][^/]+)\/"/\1/p' | tac
+    jenkapi view/%20%20%20%20Dev%20Builds/job/pente-ggsn_tag | jq '.jobs[].url' | sed -nE 's/.*job\/([0-9][^/]+)\/"/\1/p' | tac
 }
 
 function jpatches
 {
-    jenkapi view/Patch%20builds/job/pente-ggsn_patch | jq '.builds' | grep url | sed -nE 's/.*job\/([0-9][^/]+)\/",/\1/p'
+    #jenkapi $MASTER_ROOT 
+    #'.builds[].url'
+    #| sed -nE 's/.*job\/[^/]+\/([0-9]+)\/"/\1/p'
+    #
 }
 
 function ccc
@@ -244,11 +299,9 @@ function ccc
 
 zstyle -e ':completion:*:(mcssh):hosts' hosts 'reply=(${=${${(f)"$(cat {/etc/ssh_,~/.ssh/known_}hosts(|2)(N) /dev/null)"}%%[# ]*}//,/ })'
 
-if [ -f ~/resilienceFns.sh ] ; then
-    source ~/resilienceFns.sh
-fi
+[[ -f ~/resilienceFns.sh ]] && source ~/resilienceFns.sh
 
-if [ -d /home/spastukhov/build-tools/vcpkg ] ; then
+if [[ -d /home/spastukhov/build-tools/vcpkg ]]; then
     export VCPKG_ROOT=/home/spastukhov/build-tools/vcpkg
     export PATH=$PATH:${VCPKG_ROOT}
     autoload bashcompinit
