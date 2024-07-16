@@ -1,7 +1,7 @@
 #!/bin/bash
 # This script is used to build and install neovim from source
 
-branch=${1:-nightly}
+branch=${1:-stable}
 dstDir=${2:-/opt/nvim}
 
 SUDO=$([ $(id -u) -ne 0 ] && echo sudo)
