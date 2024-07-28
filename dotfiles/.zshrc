@@ -160,8 +160,6 @@ $HAVE_GO && plugins+=(golang)
 $HAVE_DOCKER && plugins+=(docker docker-compose)
 $HAVE_RUST && plugins+=(rust)
 $HAVE_NODE && plugins+=(node npm)
-$HAVE_RIPGREP && plugins+=(ripgrep)
-$HAVE_FD && plugins+=(fd)
 $HAVE_TMUX && plugins+=(tmux)
 
 ZSH_CUSTOM=${DOTFILES_ROOT}/zsh_custom
@@ -182,6 +180,7 @@ if $HAVE_FZF; then
     export FZF_DEFAULT_OPTS='--height=~90% --ansi --preview "bat --color=always --line-range :500 {}" --preview-window=right:wrap'
     #export FZF_DEFAULT_OPTS='--ansi --preview "bat --color=always --style=header,grid --line-range :500 {}" --preview-window=down:3:wrap'
     #export FZF_DEFAULT_OPTS='--height 40% --layout=reverse --border --ansi --preview "bat --color=always --style=header,grid --line-range :500 {}" --preview-window=down:3:wrap'
+    alias vimf='vim $(fzf)'
 fi
 source $ZSH/oh-my-zsh.sh
 
@@ -308,5 +307,5 @@ if [[ -d /home/spastukhov/build-tools/vcpkg ]]; then
     bashcompinit
     source ${VCPKG_ROOT}/scripts/vcpkg_completion.zsh
 fi
-
-
+# temp
+export ASAN_OPTIONS=detect_leaks=0
