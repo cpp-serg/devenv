@@ -162,6 +162,9 @@ return {
                 jinja_lsp={
                     filetypes = {"jinja"},
                 },
+                gopls={
+                    filetypes = {"go"},
+                },
                 clangd = {
                     mason = false,
                     cmd = {
@@ -171,10 +174,11 @@ return {
                         "--background-index",
                         string.format("-j=%d",#vim.loop.cpu_info()),
                         "--all-scopes-completion",
-                        -- "--clang-tidy",
+                        "--clang-tidy",
+                        "--cross-file-rename",
                         -- "--compile_args_from=filesystem", -- lsp-> does not come from compie_commands.json
                         "--completion-parse=always",
-                        "--completion-style=bundled",
+                        "--completion-style=detailed",
                         "--cross-file-rename",
                         "--debug-origin",
                         "--enable-config", -- clangd 11+ supports reading from .clangd configuration file
@@ -186,6 +190,7 @@ return {
                         "--suggest-missing-includes",
                         -- "--resource-dir="
                         "--log=error",
+                        "--query-driver=/opt/rh/gcc-toolset-10/root/bin/g++,/usr/bin/**/clang-*,/bin/clang,/bin/clang++,/usr/bin/gcc,/usr/bin/g++,/opt/llvm-18/bin/clang,/opt/llvm-18/bin/clang++",
                         -- "--query-driver=/usr/bin/g++", 
                     },
                 },
