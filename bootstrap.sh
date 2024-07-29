@@ -3,7 +3,7 @@
 
 TARGET_ROOT=~/devenv
 
-git clone --recursive https://github.com/cpp-serg/devenv.git ${TARGET_ROOT}
+git clone --recursive -j10 https://github.com/cpp-serg/devenv.git ${TARGET_ROOT}
 
 if ! type zsh >/dev/null 2>&1; then
     sudo dnf install -y zsh
