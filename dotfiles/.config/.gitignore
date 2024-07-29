@@ -1,10 +1,7 @@
-ookla/
-mc/
+*
+!gdb
+!nvim
+!lazygit
+!git
+!tmux
 
-github-copilot
-htop
-procps
-systemd
-gh
-gh-copilot
-go

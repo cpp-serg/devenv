@@ -309,3 +309,6 @@ if [[ -d /home/spastukhov/build-tools/vcpkg ]]; then
 fi
 # temp
 export ASAN_OPTIONS=detect_leaks=0
+
+[[ -f ~/.zshrc.local ]] && source ~/.zshrc.local
+
