@@ -1,9 +1,9 @@
 #!/bin/bash
 
 # check if names below exist, rename them to bak
-if [ -e ~/.config] ; then mv ~/.config ~/.config.bak; fi
-if [ -e ~/.tmux] ; then mv ~/.tmux ~/.tmux.bak; fi
-if [ -e ~/.zshrc] ; then mv ~/.zshrc ~/.zshrc.bak; fi
+[[ -e ~/.config ]] && mv ~/.config ~/.config.bak
+[[ -e ~/.tmux ]] && mv ~/.tmux ~/.tmux.bak
+[[ -e ~/.zshrc ]] && mv ~/.zshrc ~/.zshrc.bak
 
 ln -s ~/devenv/dotfiles/.config ~/.config
 ln -s ~/devenv/dotfiles/.tmux ~/.tmux
