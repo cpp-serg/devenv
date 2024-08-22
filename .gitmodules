@@ -1,5 +1,5 @@
 [submodule "dotfiles/.tmux/plugins/tpm"]
-	path = dotfiles/.tmux/plugins/tpm
+	path = dotfiles/.config/tmux/plugins/tpm
 	url = https://github.com/tmux-plugins/tpm
 [submodule "dotfiles/zsh_custom/plugins/zsh-autosuggestions"]
 	path = dotfiles/zsh_custom/plugins/zsh-autosuggestions
