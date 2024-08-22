@@ -46,9 +46,7 @@ return {
                 'kanagawa-dragon',
                 'kanagawa-wave',
             }, -- Your list of installed colorschemes
-            themeConfigFile = '~/.config/nvim/lua/settings/theme.lua', -- Described below
             livePreview = true, -- Apply theme while browsing. Default to true.
         })
-        require('settings/theme')
     end,
 }
