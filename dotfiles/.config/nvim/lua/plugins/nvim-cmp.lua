@@ -84,8 +84,9 @@ return {
                     end, { 'i', 's' }),
                 }),
                 sources = {
-                    { name = 'cody' },
+                    --{ name = 'cody' },
                     { name = 'nvim_lsp' },
+                    { name = 'supermaven' },
                     { name = 'luasnip' },
                     { name = 'path' },
                 },
