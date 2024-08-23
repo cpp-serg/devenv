@@ -185,88 +185,98 @@ end
 
 -- stylua: ignore
 local function SetKeymap()
-    -- [[ Basic Keymaps ]]
-    --  See `:help vim.keymap.set()`
-    vim.keymap.set('n', '<leader>HH'      , '<cmd>e ~/.config/nvim/init.lua<cr>'    , { desc = 'Edit nvim init' })
+    local whichKey = require('which-key')
+    local addGroup = function(spec)
+        whichKey.add({spec})
+    end
 
-    -- Clear hlsearch on pressing <Esc> in normal mode
-    vim.keymap.set('n', '<Esc>', '<cmd>nohlsearch<cr>')
-
-    vim.keymap.set('n', '<C-n>', '<cmd>NvimTreeToggle<cr>')
-    vim.keymap.set('n', '<Tab>', '<cmd>e #<cr>')
-    vim.keymap.set('n', '<leader>x', '<cmd>bdelete<cr>')
-    vim.keymap.set('n', '<leader>X', '<cmd>bdelete!<cr>')
-    vim.keymap.set('n', '<leader>bO', '<cmd>BufferLineCloseOthers<cr>')
-
-    -- Diagnostic keymaps
-    vim.keymap.set('n', '[d'       , vim.diagnostic.goto_prev , { desc = 'Go to previous [D]iagnostic message' })
-    vim.keymap.set('n', ']d'       , vim.diagnostic.goto_next , { desc = 'Go to next [D]iagnostic message' })
-    vim.keymap.set('n', '<leader>e', vim.diagnostic.open_float, { desc = 'Show diagnostic [E]rror messages' })
-    vim.keymap.set('n', '<leader>q', vim.diagnostic.setloclist, { desc = 'Open diagnostic [Q]uickfix list' })
-
-    -- Disable arrow keys in normal mode
-    vim.keymap.set('n', '<left>', '<cmd>echo "Use h to move!!"<cr>')
-    vim.keymap.set('n', '<right>', '<cmd>echo "Use l to move!!"<cr>')
-    vim.keymap.set('n', '<up>', '<cmd>echo "Use k to move!!"<cr>')
-    vim.keymap.set('n', '<down>', '<cmd>echo "Use j to move!!"<cr>')
-
-    -- Keybinds to make split navigation easier.
-    --  Use CTRL+<hjkl> to switch between windows
-    --
-    --  See `:help wincmd` for a list of all window commands
-    vim.keymap.set('n', '<C-h>', '<C-w><C-h>', { desc = 'Move focus to the left window' })
-    vim.keymap.set('n', '<C-l>', '<C-w><C-l>', { desc = 'Move focus to the right window' })
-    vim.keymap.set('n', '<C-j>', '<C-w><C-j>', { desc = 'Move focus to the lower window' })
-    vim.keymap.set('n', '<C-k>', '<C-w><C-k>', { desc = 'Move focus to the upper window' })
+    local addKey = vim.keymap.set
 
     local teleBuiltin = require('telescope.builtin')
     local gitSigns = require('gitsigns.actions')
     local harpoonMarks = require('harpoon.mark')
 
-    vim.keymap.set('n', '<leader>ff'      , teleBuiltin.find_files                     , { desc = 'File search' })
-    vim.keymap.set('n', '<leader>gr'      , teleBuiltin.grep_string                    , { desc = 'Grep over current string' })
-    vim.keymap.set('n', '<leader>fg'      , teleBuiltin.live_grep                      , { desc = 'Live grep' })
-    vim.keymap.set('n', '<leader>bb'      , teleBuiltin.buffers                        , { desc = 'Telescope buffers' })
-    vim.keymap.set('n', '<leader>qq'      , teleBuiltin.quickfix                       , { desc = 'Telescope quickfix' })
+    addGroup { "<leader>c", group = "[C]ode" }
+    addGroup { "<leader>d", group = "[D]ocument" }
+    addGroup { "<leader>r", group = "[R]ename" }
+    addGroup { "<leader>s", group = "[S]earch" }
+    addGroup { "<leader>w", group = "[W]orkspace" }
 
-    vim.keymap.set('n', '<leader>ss'      , teleBuiltin.lsp_document_symbols           , { desc = 'Telescope document symbols' })
-    vim.keymap.set('n', '<leader>sw'      , teleBuiltin.lsp_workspace_symbols          , { desc = 'Telescope workspace symbols' })
-    vim.keymap.set('n', 'gR'              , teleBuiltin.lsp_references                 , { desc = 'Telescope references' })
-    vim.keymap.set('n', 'gr'              , '<cmd>Glance references<cr>'               , { desc = 'Glance references' })
-    vim.keymap.set('n', '<leader>dd'      , teleBuiltin.diagnostics                    , { desc = 'Telescope references' })
-    vim.keymap.set('n', '<leader>gb'      , teleBuiltin.git_branches                   , { desc = 'Telescope references' })
-    vim.keymap.set('n', '<leader><leader>', teleBuiltin.resume                         , { desc = 'Resume last Telescope session' })
+    -- [[ Basic Keymaps ]]
+    addKey('n', '<leader>CC', '<cmd>e ~/.config/nvim/init.lua<cr>', { desc = 'Edit nvim init' })
 
-    vim.keymap.set('n', '<leader>th'      , '<cmd>Themery<cr>'                         , { desc = 'Themery' })
-    vim.keymap.set('n', '<leader>o'       , vim.cmd.only                               , { desc = 'Leave only current window' })
+    -- Clear hlsearch on pressing <Esc> in normal mode
+    addKey('n', '<Esc>', '<cmd>nohlsearch<cr>')
+
+    addKey('n', '<C-n>'        , '<cmd>NvimTreeToggle<cr>')
+    addKey('n', '<Tab>'        , '<cmd>e #<cr>')
+    addKey('n', '<leader>x'    , '<cmd>bdelete<cr>')
+    addKey('n', '<leader>X'    , '<cmd>bdelete!<cr>')
+    addKey('n', '<leader>bO'   , '<cmd>BufferLineCloseOthers<cr>')
+
+    -- Diagnostic keymaps
+    addKey('n', '[d'       , vim.diagnostic.goto_prev , { desc = 'Go to previous [D]iagnostic message' })
+    addKey('n', ']d'       , vim.diagnostic.goto_next , { desc = 'Go to next [D]iagnostic message' })
+    addKey('n', '<leader>e', vim.diagnostic.open_float, { desc = 'Show diagnostic [E]rror messages' })
+    addKey('n', '<leader>q', vim.diagnostic.setloclist, { desc = 'Open diagnostic [Q]uickfix list' })
+
+    -- Disable arrow keys in normal mode
+    addKey('n', '<left>' , '<cmd>echo "Use h to move!!"<cr>')
+    addKey('n', '<right>', '<cmd>echo "Use l to move!!"<cr>')
+    addKey('n', '<up>'   , '<cmd>echo "Use k to move!!"<cr>')
+    addKey('n', '<down>' , '<cmd>echo "Use j to move!!"<cr>')
+
+    -- Keybinds to make split navigation easier.
+    --  Use CTRL+<hjkl> to switch between windows
+    --
+    --  See `:help wincmd` for a list of all window commands
+    addKey('n', '<C-h>', '<C-w><C-h>', { desc = 'Move focus to the left window' })
+    addKey('n', '<C-l>', '<C-w><C-l>', { desc = 'Move focus to the right window' })
+    addKey('n', '<C-j>', '<C-w><C-j>', { desc = 'Move focus to the lower window' })
+    addKey('n', '<C-k>', '<C-w><C-k>', { desc = 'Move focus to the upper window' })
+
+
+    addKey('n', '<leader>ff'      , teleBuiltin.find_files                     , { desc = 'File search' })
+    addKey('n', '<leader>gr'      , teleBuiltin.grep_string                    , { desc = 'Grep over current string' })
+    addKey('n', '<leader>fg'      , teleBuiltin.live_grep                      , { desc = 'Live grep' })
+    addKey('n', '<leader>bb'      , teleBuiltin.buffers                        , { desc = 'Telescope buffers' })
+    addKey('n', '<leader>qq'      , teleBuiltin.quickfix                       , { desc = 'Telescope quickfix' })
+
+    addKey('n', '<leader>ss'      , teleBuiltin.lsp_document_symbols           , { desc = 'Telescope document symbols' })
+    addKey('n', '<leader>sw'      , teleBuiltin.lsp_workspace_symbols          , { desc = 'Telescope workspace symbols' })
+    addKey('n', 'gR'              , teleBuiltin.lsp_references                 , { desc = 'Telescope references' })
+    addKey('n', 'gr'              , '<cmd>Glance references<CR>'               , { desc = 'Glance references' })
+    addKey('n', '<leader>dd'      , teleBuiltin.diagnostics                    , { desc = 'Telescope workspace diagnostic' })
+    addKey('n', '<leader>gb'      , teleBuiltin.git_branches                   , { desc = 'Telescope git branches' })
+    addKey('n', '<leader><leader>', teleBuiltin.resume                         , { desc = 'Resume last Telescope session' })
+
+    addKey('n', '<leader>th'      , '<cmd>Themery<cr>'                         , { desc = 'Themery' })
+    addKey('n', '<leader>o'       , vim.cmd.only                               , { desc = 'Leave only current window' })
+
     -- Plug 'p00f/clangd_extensions.nvim'
-    vim.keymap.set('n', '<leader>hh'      , '<cmd>ClangdSwitchSourceHeader<cr>'        , { desc = 'Switch cpp/h' })
-    vim.keymap.set('n', '<leader>rr'      , vim.lsp.buf.rename                         , { desc = 'Rename current symbol' })
-    vim.keymap.set('n', '<leader>ii'      , ToggleInlineHints                          , { desc = 'Toggle inlay hints' })
+    addKey('n', '<leader>hh'      , '<cmd>ClangdSwitchSourceHeader<cr>'        , { desc = 'Switch cpp/h' })
+    addKey('n', '<leader>rr'      , vim.lsp.buf.rename                         , { desc = 'Rename current symbol' })
+    addKey('n', '<leader>ii'      , ToggleInlineHints                          , { desc = 'Toggle inlay hints' })
 
     -- Git stuff
-    vim.keymap.set('n', '<leader>gg'      , '<cmd>0G<cr>'                              , { desc = 'Fugitive' })
-    vim.keymap.set('n', '<leader>gs'      , teleBuiltin.git_status                     , { desc = 'Telescope git status' })
-    vim.keymap.set('n', 'gS'              , gitSigns.stage_hunk                        , { desc = 'Stage current hunk' })
-    vim.keymap.set('n', 'gp'              , gitSigns.preview_hunk                      , { desc = 'Preview hunk' })
+    addKey('n', '<leader>gg'      , '<cmd>0G<cr>'                              , { desc = 'Fugitive' })
+    addKey('n', '<leader>gs'      , teleBuiltin.git_status                     , { desc = 'Telescope git status' })
+    addKey('n', 'gS'              , gitSigns.stage_hunk                        , { desc = 'Stage current hunk' })
+    addKey('n', 'gp'              , gitSigns.preview_hunk                      , { desc = 'Preview hunk' })
 
-    -- vim.keymap.set('n', '<C-K>'           , '<cmd>.ClangFormat<cr>'                    , { desc = 'Apply ClangFormat' })
-    -- vim.keymap.set('i', '<C-K>'           , '<C-O>:.ClangFormat<cr>'                   , { desc = 'Apply ClangFormat' })
-    -- vim.keymap.set('v', '<C-K>'           , '<cmd>\'<,\'>ClangFormat<cr>'              , { desc = 'Apply ClangFormat' })
-    vim.keymap.set('n', '<C-K>'           , FormatCurrentLine                         , { desc = 'Apply ClangFormat' })
-    vim.keymap.set('v', '<C-K>'           , vim.lsp.buf.format                         , { desc = 'Apply ClangFormat' })
+    addKey('n', '<C-K>'           , FormatCurrentLine                         , { desc = 'Apply ClangFormat' })
+    addKey('v', '<C-K>'           , vim.lsp.buf.format                         , { desc = 'Apply ClangFormat' })
 
-    vim.keymap.set('n', '<leader>ll'      , ToggleLinesOnOff                           , { desc = 'Toggle lines on off' })
-    vim.keymap.set('n', '<leader>lr'      , '<cmd>set relativenumber!<cr>'             , { desc = 'Toggle relativenuber' })
-    vim.keymap.set('n', '<leader>`'       , '<cmd>cn<cr>'                              , { desc = 'Next error' })
-    vim.keymap.set('n', '<leader>m'       , '<cmd>wa<cr><cmd>make -C build/current<cr>', { desc = 'Build current config' })
-    vim.keymap.set('n', '<leader>M'       , '<cmd>wa<cr><cmd>terminal ./build.sh --no-unittests <cr>'  , { desc = 'Build current config in terminal' })
+    addKey('n', '<leader>ll'      , ToggleLinesOnOff                           , { desc = 'Toggle lines on off' })
+    addKey('n', '<leader>lr'      , '<cmd>set relativenumber!<cr>'             , { desc = 'Toggle relativenuber' })
+    addKey('n', '<leader>`'       , '<cmd>cn<cr>'                              , { desc = 'Next error' })
+    addKey('n', '<leader>m'       , '<cmd>wa<cr><cmd>make -C build/current<cr>', { desc = 'Build current config' })
+    addKey('n', '<leader>M'       , '<cmd>wa<cr><cmd>terminal ./build.sh --no-unittests <cr>'  , { desc = 'Build current config in terminal' })
 
-    vim.keymap.set('n', '<leader>ha'      , harpoonMarks.add_file                      , { desc = 'Harpoon add file' })
-    vim.keymap.set('n', '<leader>hl'      , '<cmd>Telescope harpoon marks<cr>'         , { desc = 'Harpoon telescope' })
+    addKey('n', '<leader>ha'      , harpoonMarks.add_file                      , { desc = 'Harpoon add file' })
+    addKey('n', '<leader>hl'      , '<cmd>Telescope harpoon marks<cr>'         , { desc = 'Harpoon telescope' })
 
-    vim.keymap.set('n', '<leader>tt'      , '<cmd>TSContextToggle<cr>'                 , { desc = 'Toggle Tresitter context' })
-
+    addKey('n', '<leader>tt'      , '<cmd>TSContextToggle<cr>'                 , { desc = 'Toggle Tresitter context' })
 end
 
 SetKeymap()
