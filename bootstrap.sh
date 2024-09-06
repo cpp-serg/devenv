@@ -4,6 +4,8 @@
 TARGET_ROOT=~/devenv
 
 git clone --recursive -j10 https://github.com/cpp-serg/devenv.git ${TARGET_ROOT}
+cd ${TARGET_ROOT}
+git remote set-url origin git@github.com:cpp-serg/devenv.git
 
 sudo ~/devenv/tune/os/enable-repos.sh
 sudo ~/devenv/tune/os/install-soft.sh
