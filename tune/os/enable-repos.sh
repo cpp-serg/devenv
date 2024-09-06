@@ -2,8 +2,9 @@
 
 if (yum repolist all appstream | grep disabled >/dev/null) then
     echo "Enalbe repos"
-    dnf config-manager --enable "*"
-    dnf config-manager --disable "media*"
+    sudo dnf config-manager --enable "*"
+    sudo dnf config-manager --disable "media*"
+    sudo dnf install -y epel-release
 else
     echo "Repos are enabled"
 fi

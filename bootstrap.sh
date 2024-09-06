@@ -6,6 +6,7 @@ TARGET_ROOT=~/devenv
 git clone --recursive -j10 https://github.com/cpp-serg/devenv.git ${TARGET_ROOT}
 
 sudo ~/devenv/tune/os/enable-repos.sh
+sudo ~/devenv/tune/os/install-soft.sh
 
 if ! type zsh >/dev/null 2>&1; then
     sudo dnf install -y zsh
