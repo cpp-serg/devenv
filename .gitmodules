@@ -1,4 +1,4 @@
-[submodule "dotfiles/.tmux/plugins/tpm"]
+[submodule "dotfiles/.config/tmux/plugins/tpm"]
 	path = dotfiles/.config/tmux/plugins/tpm
 	url = https://github.com/tmux-plugins/tpm
 [submodule "dotfiles/zsh_custom/plugins/zsh-autosuggestions"]
