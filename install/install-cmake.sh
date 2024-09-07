@@ -15,7 +15,7 @@ SUDO=$([ $(id -u) -ne 0 ] && echo sudo)
 if [ -n "$1" ]; then
   CMAKE_VER=$1
 else
-  CMAKE_VER=$(curl -s https://cmake.org/download | xmllint  --html --nowarning --xpath '//*[@id="latest"]/text()' - 2>/dev/null | sed -rn "s/.*\((.+)\)/\1/p")
+  CMAKE_VER=$(curl -Ls https://cmake.org/download | xmllint  --html --nowarning --xpath '//*[@id="latest"]/text()' - 2>/dev/null | sed -rn "s/.*\((.+)\)/\1/p")
 fi
 
 echo "Installing CMake version $CMAKE_VER"
