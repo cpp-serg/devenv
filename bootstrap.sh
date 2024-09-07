@@ -14,8 +14,10 @@ if ! type zsh >/dev/null 2>&1; then
     sudo dnf install -y zsh
 fi
 
-sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+CHSH=yes RUNZSH=no sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
 mv ~/.zshrc ~/.zshrc.orig
 
 ${TARGET_ROOT}/dotfiles/set-links.sh
+
+zsh
 
