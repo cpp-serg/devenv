@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 DST_DIR=/opt/cmake
 
@@ -7,10 +7,8 @@ function die() {
   exit 1
 }
 
-# set SUDO conditionally
-if [ $(id -u) -ne 0 ]; then
-  SUDO=sudo
-fi
+# set ${SUDO} conditionally
+SUDO=$([ $(id -u) -ne 0 ] && echo sudo)
 
 # if first argument is not empty, use it as the version
 # otherwise figure out latest version
@@ -32,3 +30,4 @@ $SUDO mkdir /opt/cmake && $SUDO sh install_cmake.sh --skip-license --exclude-sub
 $SUDO alternatives --install /usr/local/bin/cmake cmake /opt/cmake/bin/cmake 100
 $SUDO alternatives --install /usr/local/bin/ccmake ccmake /opt/cmake/bin/ccmake 100
 $SUDO alternatives --install /usr/local/bin/ctest ctest /opt/cmake/bin/ctest 100
+hash -r # reload hash table so that the new cmake is found
