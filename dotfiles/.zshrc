@@ -273,6 +273,16 @@ function jenkapi
     jenk -q -O - ${jenk_serv}/${1}/api/json | jq
 }
 
+function git-here
+{
+    git init 
+    git config --global --add safe.directory $(pwd)
+    git config user.email "sergiy@pentenetworks.com"
+    git config "Sergiy"
+    git add .
+    git commit -m "initial commit"
+}
+
 MASTER_ROOT=job/pente-ggsn
 MVNO_ROOT=view/%20%20%20%20%20MVNO%20Official%20Builds/job/pente-ggsn-MVNO
 PATCHES_ROOT=view/%20%20%20%20%20Patch%20builds/job/pente-ggsn_patch
