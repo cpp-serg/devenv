@@ -1,3 +1,4 @@
+local isSpPrivate = vim.fn.filereadable('~/.sp-private-host') == 1
 -- disable netrw at the very start of init.lua, so nvim-tree takes care of file navigation
 vim.g.loaded_netrw = 1
 vim.g.loaded_netrwPlugin = 1
@@ -220,11 +221,19 @@ local function SetKeymap()
     addKey('n', '<leader>e', vim.diagnostic.open_float, { desc = 'Show diagnostic [E]rror messages' })
     addKey('n', '<leader>q', vim.diagnostic.setloclist, { desc = 'Open diagnostic [Q]uickfix list' })
 
-    -- Disable arrow keys in normal mode
-    addKey('n', '<left>' , '<cmd>echo "Use h to move!!"<cr>')
-    addKey('n', '<right>', '<cmd>echo "Use l to move!!"<cr>')
-    addKey('n', '<up>'   , '<cmd>echo "Use k to move!!"<cr>')
-    addKey('n', '<down>' , '<cmd>echo "Use j to move!!"<cr>')
+    if isSpPrivate then
+        -- Disable arrow keys in normal mode
+        addKey('n', '<left>' , '<cmd>echo "Use h to move!!"<cr>')
+        addKey('n', '<right>', '<cmd>echo "Use l to move!!"<cr>')
+        addKey('n', '<up>'   , '<cmd>echo "Use k to move!!"<cr>')
+        addKey('n', '<down>' , '<cmd>echo "Use j to move!!"<cr>')
+    else
+        -- print hint, but do not disable
+        addKey('n', '<left>' , '<cmd>echo "Use h to move!!"<cr>h')
+        addKey('n', '<right>', '<cmd>echo "Use l to move!!"<cr>l')
+        addKey('n', '<up>'   , '<cmd>echo "Use k to move!!"<cr>k')
+        addKey('n', '<down>' , '<cmd>echo "Use j to move!!"<cr>j')
+    end
 
     -- Keybinds to make split navigation easier.
     --  Use CTRL+<hjkl> to switch between windows
