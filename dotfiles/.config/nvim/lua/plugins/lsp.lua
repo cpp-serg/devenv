@@ -94,6 +94,16 @@ return {
                 require('cmp_nvim_lsp').default_capabilities()
             )
 
+            local useMason = true
+            local clangPath = 'clang'
+
+            if vim.fn.executable('/opt/llvm-18/bin/clangd') == 1 then
+                clangPath = "/opt/llvm-18/bin/clangd"
+                useMason = false
+            elseif  vim.fn.executable('clangd') == 1 then
+                useMason = false
+            end
+
             -- Enable the following language servers
             --  Feel free to add/remove any LSPs that you want here. They will automatically be installed.
             --
@@ -104,17 +114,10 @@ return {
             --  - settings (table): Override the default settings passed when initializing the server.
             --        For example, to see the options for `lua_ls`, you could go to: https://luals.github.io/wiki/settings/
             local servers = {
-                jinja_lsp={
-                    filetypes = {"jinja"},
-                },
-                gopls={
-                    filetypes = {"go"},
-                },
                 clangd = {
-                    mason = false,
+                    mason = useMason,
                     cmd = {
-                        "/opt/llvm-18/bin/clangd",
-                        -- "clangd",
+                        clangPath,
                         "--offset-encoding=utf-16",
                         "--background-index",
                         string.format("-j=%d",#vim.loop.cpu_info()),
@@ -178,6 +181,18 @@ return {
                     },
                 },
             }
+
+            if vim.fn.executable('go') == 1 then
+                servers['gopls'] = {
+                    filetypes = {'go'},
+                }
+            end
+
+            if vim.fn.executable('jinja') == 1 or vim.fn.executable('jinja2') == 1 then
+                servers['jinja_lsp']={
+                    filetypes = {'jinja'},
+                }
+            end
 
             -- Ensure the servers and tools above are installed
             --  To check the current status of installed tools and/or manually install
