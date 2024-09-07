@@ -263,8 +263,9 @@ local function SetKeymap()
     addKey('n', '<leader>gs'      , teleBuiltin.git_status                     , { desc = 'Telescope git status' })
     addKey('n', 'gS'              , gitSigns.stage_hunk                        , { desc = 'Stage current hunk' })
     addKey('n', 'gp'              , gitSigns.preview_hunk                      , { desc = 'Preview hunk' })
+    addKey('n', '<leader>gR'      , gitSigns.reset_hunk                        , { desc = 'Reset hunk' })
 
-    addKey('n', '<C-K>'           , FormatCurrentLine                         , { desc = 'Apply ClangFormat' })
+    addKey('n', '<C-K>'           , FormatCurrentLine                          , { desc = 'Apply ClangFormat' })
     addKey('v', '<C-K>'           , vim.lsp.buf.format                         , { desc = 'Apply ClangFormat' })
 
     addKey('n', '<leader>ll'      , ToggleLinesOnOff                           , { desc = 'Toggle lines on off' })
