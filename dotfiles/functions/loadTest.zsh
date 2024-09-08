@@ -1,3 +1,7 @@
+# Helper functions for load testing
+
+####################################################################################################
+# DUT functions
 function ltAmfStats() {
     echo "AMF Stats"
     curl -m 1 -s 127.0.0.18:39091/metrics | grep -E "^(gnb|amf_session|ran_ue)"
@@ -41,7 +45,8 @@ function cleanLogs() {
     startServices
 }
 
- 
+####################################################################################################
+# Client functions
 function stopContainers {
     echo "Stopping docker processes"
     pids=($(docker ps -a -q))
@@ -53,8 +58,7 @@ function stopContainers {
     fi
 }
 
-
-funciton loadStop() {
+function loadStop() {
     echo "Stopping simulate_real_uesrs processes"
     pids=($(ps -ef | grep -i simulate_real_uesrs | grep -v grep | awk '{print $2}'))
     if [[ -z $pids ]]; then
@@ -65,5 +69,20 @@ funciton loadStop() {
     fi
 
     stopContainers
+}
+
+####################################################################################################
+# Server functions
+function serverStart() {
+    ~/iperf_server.sh start
+}
+function serverStop() {
+    ~/iperf_server.sh stop
+}
+function serverRestart() {
+    serverStop && serverStart
+}
+function serverStatus() {
+    ~/iperf_server.sh status
 }
 
