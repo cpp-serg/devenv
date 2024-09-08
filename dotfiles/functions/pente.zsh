@@ -71,6 +71,21 @@ function restoreOriginalBins {
     done
 }
 
+function gwstart() {
+    systemctl start {p,s}gw-{c,u}p
+}
+
+function gwstop() {
+    systemctl stop {p,s}gw-{c,u}p
+}
+
+function gwrestart {
+    systemctl restart {p,s}gw-{c,u}p
+}
+
+function gwstatus() {
+    systemctl status {p,s}gw-{c,u}p | rg --color=never "Active:" | rg --color=always ":.+\)"
+}
 
 function useCustomBins {
     for binary in ggsn sgw_cp sgw_up
