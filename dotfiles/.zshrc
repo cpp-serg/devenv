@@ -268,9 +268,9 @@ if [[ -d /home/spastukhov/build-tools/vcpkg ]]; then
 fi
 
 SP_FUNCTIONS_ROOT=${SP_DOTFILES_ROOT}/functions
-source ${SP_FUNCTIONS_ROOT}/jenkins.zsh
-source ${SP_FUNCTIONS_ROOT}/git.zsh
-source ${SP_FUNCTIONS_ROOT}/pente.zsh
+for fn in $(ls ${SP_FUNCTIONS_ROOT}/*.zsh); do
+    source ${fn}
+done
 
 [[ -f ~/.local-functions.zsh ]] && source ~/.local-functions.zsh
 [[ -f ~/.zshrc.local ]] && source ~/.zshrc.local
