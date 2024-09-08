@@ -1,5 +1,5 @@
-DEVENV_ROOT="${HOME}/devenv"
-DOTFILES_ROOT="${DEVENV_ROOT}/dotfiles"
+export SP_DEVENV_ROOT="${HOME}/devenv"
+export SP_DOTFILES_ROOT="${SP_DEVENV_ROOT}/dotfiles"
 
 function HaveTool {
     if (( $+commands[$1] )); then
@@ -162,7 +162,7 @@ $HAVE_RUST && plugins+=(rust)
 $HAVE_NODE && plugins+=(node npm)
 $HAVE_TMUX && plugins+=(tmux)
 
-ZSH_CUSTOM=${DOTFILES_ROOT}/zsh_custom
+ZSH_CUSTOM=${SP_DOTFILES_ROOT}/zsh_custom
 
 for custom_plug in $(ls ${ZSH_CUSTOM}/plugins); do
     plugins+=(${custom_plug})
@@ -246,9 +246,6 @@ function changeTps {
     done
     ll ~/ggsn/third_party
 }
-function ddf {
-    delta $1 ~/jpu-tests-sp/helpers/core/testPython/$1
-}
 
 function cleanPatch
 {
@@ -260,55 +257,7 @@ function mcssh
     mc $(pwd) sh://$1:C/$2
 }
 
-function jenk
-{
-    user='sergiy@pentenetworks.com'
-    token='11555f916ea5a61c13f876455ea547f351'
-    wget --auth-no-challenge  --user $user --password $token $*
-}
-
-function jenkapi
-{
-    jenk_serv=http://jenkinsil.jpu.io
-    jenk -q -O - ${jenk_serv}/${1}/api/json | jq
-}
-
-function git-here
-{
-    git init 
-    git config --global --add safe.directory $(pwd)
-    git config user.email "sergiy@pentenetworks.com"
-    git config "Sergiy"
-    git add .
-    git commit -m "initial commit"
-}
-
-MASTER_ROOT=job/pente-ggsn
-MVNO_ROOT=view/%20%20%20%20%20MVNO%20Official%20Builds/job/pente-ggsn-MVNO
-PATCHES_ROOT=view/%20%20%20%20%20Patch%20builds/job/pente-ggsn_patch
-TAGS_ROOT=view/%20%20%20%20Dev%20Builds/job/pente-ggsn_tag
-
-function jtags
-{
-    jenkapi view/%20%20%20%20Dev%20Builds/job/pente-ggsn_tag | jq '.jobs[].url' | sed -nE 's/.*job\/([0-9][^/]+)\/"/\1/p' | tac
-}
-
-function jpatches
-{
-    #jenkapi $MASTER_ROOT 
-    #'.builds[].url'
-    #| sed -nE 's/.*job\/[^/]+\/([0-9]+)\/"/\1/p'
-    #
-}
-
-function ccc
-{
-    delta $1 ~/ggsn/$1
-}
-
 zstyle -e ':completion:*:(mcssh):hosts' hosts 'reply=(${=${${(f)"$(cat {/etc/ssh_,~/.ssh/known_}hosts(|2)(N) /dev/null)"}%%[# ]*}//,/ })'
-
-[[ -f ~/resilienceFns.sh ]] && source ~/resilienceFns.sh
 
 if [[ -d /home/spastukhov/build-tools/vcpkg ]]; then
     export VCPKG_ROOT=/home/spastukhov/build-tools/vcpkg
@@ -317,8 +266,12 @@ if [[ -d /home/spastukhov/build-tools/vcpkg ]]; then
     bashcompinit
     source ${VCPKG_ROOT}/scripts/vcpkg_completion.zsh
 fi
-# temp
-export ASAN_OPTIONS=detect_leaks=0
 
+SP_FUNCTIONS_ROOT=${SP_DOTFILES_ROOT}/functions
+source ${SP_FUNCTIONS_ROOT}/jenkins.zsh
+source ${SP_FUNCTIONS_ROOT}/git.zsh
+source ${SP_FUNCTIONS_ROOT}/pente.zsh
+
+[[ -f ~/.local-functions.zsh ]] && source ~/.local-functions.zsh
 [[ -f ~/.zshrc.local ]] && source ~/.zshrc.local
 
