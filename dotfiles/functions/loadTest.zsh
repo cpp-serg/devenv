@@ -71,6 +71,16 @@ function loadStop() {
     stopContainers
 }
 
+function loadStart() {
+    count=$(ls *_run.sh | wc -l)
+    echo "Starting load for $count scenarios"
+    for c in $(seq 1 ${count}); do
+        ./${c}_run.sh
+        ./iperf_client_${c}.sh start
+    done
+    echo "Running $(docker ps -a -q | wc -l) containers"
+}
+
 ####################################################################################################
 # Server functions
 function serverStart() {
