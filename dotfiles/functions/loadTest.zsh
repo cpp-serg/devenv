@@ -81,6 +81,10 @@ function loadStart() {
     echo "Running $(docker ps -a -q | wc -l) containers"
 }
 
+function loadRestart() {
+    loadStop && loadStart
+}
+
 ####################################################################################################
 # Server functions
 function serverStart() {
