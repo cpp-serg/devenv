@@ -40,3 +40,28 @@ function cleanLogs() {
     done
     startServices
 }
+
+ 
+function stopContainers {
+    echo "Stopping docker processes"
+    pids="$(docker ps -a -q)"
+    if [[ -n $pids ]]; then
+        docker rm --force $pids && echo "Stopped $pids"
+    else
+        echo "No containers running"
+    fi
+}
+
+
+funciton loadStop() {
+    echo "Stopping simulate_real_uesrs processes"
+    pids="$(ps -ef | grep -i simulate_real_uesrs | grep -v grep | awk '{print $2}')"
+    if [[ -n $pids ]]; then
+        kill -9 $pids && echo "Stopped $pids"
+    else
+        echo "No simulate_real_uesrs processes found"
+    fi
+
+    stopContainers
+}
+
