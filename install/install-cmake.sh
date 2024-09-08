@@ -26,6 +26,7 @@ fi
 
 curl -fsSL https://github.com/Kitware/CMake/releases/download/v$CMAKE_VER/cmake-$CMAKE_VER-linux-x86_64.sh -o install_cmake.sh || die "Failed to download CMake installer"
 $SUDO mkdir /opt/cmake && $SUDO sh install_cmake.sh --skip-license --exclude-subdir --prefix=$DST_DIR
+rm install_cmake.sh
 
 $SUDO alternatives --install /usr/local/bin/cmake cmake /opt/cmake/bin/cmake 100
 $SUDO alternatives --install /usr/local/bin/ccmake ccmake /opt/cmake/bin/ccmake 100
