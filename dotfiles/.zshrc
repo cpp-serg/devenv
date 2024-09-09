@@ -279,3 +279,12 @@ fi
 [[ -f ~/.local-functions.zsh ]] && source ~/.local-functions.zsh
 [[ -f ~/.zshrc.local ]] && source ~/.zshrc.local
 
+PENTE_EDGE_ID=$(grep -i  'EdgeId' /home/pente/auc/conf/config.properties 2>/dev/null | grep -oE '[0-9]+$')
+if [[ -n "${PENTE_EDGE_ID}" ]]; then
+    export RPS1="%{$fg_bold[red]%}$(hostname)(E:${PENTE_EDGE_ID})%{$reset_color%}"
+else
+    export RPS1="%{$fg_bold[red]%}$(hostname)%{$reset_color%}"
+fi
+
+[[ -n "${PENTE_HOST_IP}" ]] && RPS1="${RPS1} - ${PENTE_HOST_IP}"
+
