@@ -152,7 +152,7 @@ HIST_STAMPS="yyyy-mm-dd"
 
 # Would you like to use another custom folder than $ZSH/custom?
 # ZSH_CUSTOM=/path/to/new-custom-folder
-plugins=(cp yum dnf sudo pip)
+plugins=(cp yum dnf pip)
 
 $HAVE_FZF && plugins+=(fzf)
 $HAVE_GIT && plugins+=(git)
