@@ -61,3 +61,4 @@
 	directory = /home/pente/amfd/conf
 	directory = /home/pente/gtp-broker/conf
 	directory = /home/pente/5g-broker/conf
+	directory = /home/pente/ggsn/conf
