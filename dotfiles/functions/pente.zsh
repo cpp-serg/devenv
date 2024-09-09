@@ -67,8 +67,10 @@ function restoreOriginalBins {
 
     for binary in ggsn sgw_cp sgw_up
     do
+        chown pente:pente /home/pente/ggsn/bin/${binary}
         setcap cap_net_admin=+ep /home/pente/ggsn/bin/${binary}
     done
+    changeGwUser pente
 }
 
 function gwstart() {
@@ -85,6 +87,7 @@ function gwrestart {
 
 function gwstatus() {
     systemctl status {p,s}gw-{c,u}p | rg --color=never "Active:" | rg --color=always ":.+\)"
+    ps -elf | grep ggsn | grep -vE "(bash|grep)" | cut -c-${COLUMNS}
 }
 
 function useCustomBins {
@@ -108,6 +111,7 @@ function useCustomBins {
     do
         ln -sf /home/pente/ggsn/bin/${binary}-custom /home/pente/ggsn/bin/${binary}
     done
+    changeGwUser root
 }
 
 
