@@ -9,7 +9,7 @@ function ltAmfStats() {
 
 function ltStatus() {
     ltAmfStats
-    echo \nRoutes
+    echo "\nRoutes"
     if (ip r | grep -E "172.2[45].*"); then
         return 0
     else
