@@ -272,6 +272,10 @@ for fn in $(ls ${SP_FUNCTIONS_ROOT}/*.zsh); do
     source ${fn}
 done
 
+if [[ -f /bin/zsh ]]; then
+    export SHELL=/bin/zsh
+fi
+
 [[ -f ~/.local-functions.zsh ]] && source ~/.local-functions.zsh
 [[ -f ~/.zshrc.local ]] && source ~/.zshrc.local
 
