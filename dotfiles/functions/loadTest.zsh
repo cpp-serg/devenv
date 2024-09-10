@@ -94,7 +94,9 @@ function serverStop() {
     ~/iperf_server.sh stop
 }
 function serverRestart() {
-    serverStop && serverStart
+    serverStop || return 1
+    sleep 2
+    serverStart
 }
 function serverStatus() {
     ~/iperf_server.sh status
