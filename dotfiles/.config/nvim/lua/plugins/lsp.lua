@@ -95,7 +95,7 @@ return {
             )
 
             local useMason = true
-            local clangPath = 'clang'
+            local clangPath = 'clangd'
 
             if vim.fn.executable('/opt/llvm-18/bin/clangd') == 1 then
                 clangPath = "/opt/llvm-18/bin/clangd"
