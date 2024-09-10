@@ -36,4 +36,5 @@ ${SUDO} update-alternatives --install /usr/local/bin/nvim nvim /opt/nvim/bin/nvi
 ${SUDO} update-alternatives --install /usr/local/bin/vim vim /usr/local/bin/nvim 100
 ${SUDO} update-alternatives --install /usr/local/bin/vi vi /usr/local/bin/nvim 100
 hash -r  # reload hash table so that new version of nvim is found
+rm -rf neovim
 
