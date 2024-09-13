@@ -288,3 +288,4 @@ fi
 
 [[ -n "${PENTE_HOST_IP}" ]] && RPS1="${RPS1} - ${PENTE_HOST_IP}"
 
+alias vim='nvim'
