@@ -13,6 +13,5 @@ return {
     { 'folke/trouble.nvim' },
 
     { 'rhysd/vim-clang-format'},
-    { 'numToStr/Comment.nvim' },
     -- { 'SmiteshP/nvim-navic', opts = { lsp = { auto_attach = true, preference = nil, }, } },
 }
