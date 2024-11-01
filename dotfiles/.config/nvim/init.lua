@@ -270,8 +270,10 @@ local function SetKeymap()
     -- Git stuff
     addKey('n', '<leader>gg'      , '<cmd>0G<cr>'                              , { desc = 'Fugitive' })
     addKey('n', '<leader>gs'      , teleBuiltin.git_status                     , { desc = 'Telescope git status' })
-    addKey('n', 'gS'              , gitSigns.stage_hunk                        , { desc = 'Stage current hunk' })
+    addKey('n', '<leader>gS'      , gitSigns.stage_hunk                        , { desc = 'Stage current hunk' })
     addKey('n', 'gp'              , gitSigns.preview_hunk                      , { desc = 'Preview hunk' })
+    addKey('n', '<leader>nh'      , gitSigns.next_hunk                         , { desc = 'Next hunk' })
+    addKey('n', '<leader>ph'      , gitSigns.prev_hunk                         , { desc = 'Previous hunk' })
     addKey('n', '<leader>gR'      , gitSigns.reset_hunk                        , { desc = 'Reset hunk' })
 
     addKey('n', '<C-K>'           , FormatCurrentLine                          , { desc = 'Apply ClangFormat' })
