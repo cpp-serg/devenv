@@ -62,3 +62,4 @@
 	directory = /home/pente/gtp-broker/conf
 	directory = /home/pente/5g-broker/conf
 	directory = /home/pente/ggsn/conf
+	directory = /opt/kafka/config
