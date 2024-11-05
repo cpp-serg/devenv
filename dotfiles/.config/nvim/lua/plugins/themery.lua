@@ -22,12 +22,22 @@ return {
                     colorscheme = 'gruvbox',
                     before = [[vim.opt.background = "light" ]],
                 },
+                {
+                    name = 'default light',
+                    colorscheme = 'default',
+                    before = [[vim.opt.background = "light" ]],
+                },
                 -----------------------------------------------------------------------------------------
                 --- Dark themes
                 {
                     name = 'Gruvbox dark',
                     colorscheme = 'gruvbox',
                     before = [[ vim.opt.background = "dark" ]],
+                },
+                {
+                    name = 'default dark',
+                    colorscheme = 'default',
+                    before = [[vim.opt.background = "dark" ]],
                 },
                 'monokai-pro-default',
                 'monokai-pro-classic',
