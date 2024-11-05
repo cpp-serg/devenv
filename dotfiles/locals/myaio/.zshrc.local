@@ -1,0 +1,12 @@
+uuid=$(tail -n 1 /home/pente/ggsn/bin/pgw.uuid)
+topics=(ggsn_up_${uuid} ggsn_cp_${uuid} SMF)
+
+function kafka-flush() {
+    for topic in "${topics[@]}"
+    do
+        echo "Flushing ${topic}"
+        /opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server 127.0.0.1:9092 --topic ${topic} --timeout-ms 2000 --group GGSNConsumer &
+    done
+    wait
+}
+
