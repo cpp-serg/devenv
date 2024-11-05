@@ -1,0 +1,31 @@
+#!/usr/bin/env zsh
+
+host=${1:-myaio}
+excludes=(
+    ".git"
+    "build"
+    "third_party"
+    "_INSTALL"
+    ".cache"
+)
+
+filesToInclude=(
+    "GGSN/ggsn"
+    "SGW/cp/sgw_cp"
+    "SGW/up/sgw_up"
+)
+sourceRoot=~/ggsn
+destRoot=/root/ggsn
+
+for file in ${excludes[@]}; do
+    excludeLine="${excludeLine} --exclude ${file}"
+done
+
+for file in ${filesToInclude[@]}; do
+    incLine="${incLine} --include build/current/${file}"
+done
+
+ssh ${host} -t "systemctl stop pgw-cp pgw-up"
+scp ${sourceRoot}/build/current/GGSN/ggsn ${host}:/root/ggsn/build/current/GGSN/ggsn
+rsync -va -z ${excludeLine} ${incLine} ${sourceRoot}/build/current/ --no-owner --no-group ~/ggsn ${host}:./
+ssh ${host} -t "zsh -l -c \"source ~/devenv/dotfiles/functions/loadTest.zsh&& cleanLogs\""

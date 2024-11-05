@@ -35,6 +35,8 @@ TOOL_ROOTS=(
 )
 
 
+export PATH=$PATH:~/devenv/scripts
+
 ADDED_PATHS=""
 ADDED_MANPATHS=""
 for tool in "${TOOL_ROOTS[@]}" ; do

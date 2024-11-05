@@ -284,6 +284,7 @@ local function SetKeymap()
     addKey('n', '<leader>`'       , '<cmd>cn<cr>'                              , { desc = 'Next error' })
     addKey('n', '<leader>m'       , '<cmd>wa<cr><cmd>make -C build/current<cr>', { desc = 'Build current config' })
     addKey('n', '<leader>M'       , '<cmd>wa<cr><cmd>terminal ./build.sh --no-unittests <cr>'  , { desc = 'Build current config in terminal' })
+    addKey('n', '<leader>D'       , '<cmd>wa<cr><cmd>terminal ./build.sh --no-unittests && deploy-to<cr>'  , { desc = 'Build current config in terminal and deploy to remote host' })
 
     addKey('n', '<leader>ha'      , harpoonMarks.add_file                      , { desc = 'Harpoon add file' })
     addKey('n', '<leader>hl'      , '<cmd>Telescope harpoon marks<cr>'         , { desc = 'Harpoon telescope' })
