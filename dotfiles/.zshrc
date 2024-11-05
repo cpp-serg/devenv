@@ -75,13 +75,19 @@ HAVE_NODE=$(HaveTool node)
 HAVE_TMUX=$(HaveTool tmux)
 HAVE_LAZYGIT=$(HaveTool lazygit)
 
-if [[ -d "/opt/rh/gcc-toolset-13/root/usr/share/man" ]] ; then
-    export MANPATH="$MANPATH:/opt/rh/gcc-toolset-13/root/usr/share/man"
-fi
-
 [[ -f ~/.config/.pythonrc ]] && export PYTHONSTARTUP=~/.config/.pythonrc
 [[ -f  ${HOME}/.cargo/env ]] && source "${HOME}/.cargo/env"
 [[ -f ~/.ripgreprc        ]] && export RIPGREP_CONFIG_PATH=~/.ripgreprc
+
+if [[ -d "/opt/rh/gcc-toolset-13" ]] ; then
+    if [[ -d "/opt/rh/gcc-toolset-13/root/usr/share/man" ]] ; then
+        export MANPATH="$MANPATH:/opt/rh/gcc-toolset-13/root/usr/share/man"
+    fi
+    if [[ -f /opt/rh/gcc-toolset-13/root/bin/gdb ]]; then
+        export SYSTEMD_DEBUGGER=/opt/rh/gcc-toolset-13/root/bin/gdb
+        alias gdb='/opt/rh/gcc-toolset-13/root/usr/bin/gdb'
+    fi
+fi
 
 $HAVE_DELTA && export DELTA_FEATURES=+side-by-side
 
@@ -216,7 +222,6 @@ export EDITOR='nvim'
 CORRECT_IGNORE_FILE='release'
 
 alias please='sudo $(fc -ln -1)'
-alias gdb='/opt/rh/gcc-toolset-13/root/usr/bin/gdb'
 
 if $HAVE_GIT; then
     alias glg='git lg'
