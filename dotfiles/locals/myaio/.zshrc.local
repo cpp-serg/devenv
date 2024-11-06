@@ -1,3 +1,4 @@
+export ASAN_OPTIONS=detect_leaks=0
 uuid=$(tail -n 1 /home/pente/ggsn/bin/pgw.uuid)
 topics=(ggsn_up_${uuid} ggsn_cp_${uuid} SMF)
 
