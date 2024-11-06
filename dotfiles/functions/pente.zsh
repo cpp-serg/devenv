@@ -86,8 +86,8 @@ function gwrestart {
 }
 
 function gwstatus() {
-    systemctl status {p,s}gw-{c,u}p | rg --color=never "Active:" | rg --color=always ":.+\)"
-    ps -elf | grep ggsn | grep -vE "(bash|grep)" | cut -c-${COLUMNS}
+    systemctl status {p,s}gw-{c,u}p amfd | rg --color=never "Active:" | rg --color=always ":.+\)"
+    ps -elf | rg "ggsn|amfd" | rg -v "(bash|rg)" | cut -c-${COLUMNS}
 }
 
 function useCustomBins {
