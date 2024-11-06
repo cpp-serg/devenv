@@ -89,6 +89,10 @@ if [[ -d "/opt/rh/gcc-toolset-13" ]] ; then
     fi
 fi
 
+if [[ -d /opt/couchbase ]]; then
+    alias cbq="/opt/couchbase/bin/cbq"
+fi
+
 $HAVE_DELTA && export DELTA_FEATURES=+side-by-side
 
 #export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/usr/local/python-3.11.3/lib/"
