@@ -1,14 +1,18 @@
 #!/bin/bash
 
-# set ${SUDO} conditionally
-SUDO=$([ $(id -u) -ne 0 ] && echo sudo)
+function die {
+    echo "ERROR: $*" 1>&2
+    exit 1
+}
 
-if (yum repolist all appstream | grep disabled >/dev/null) then
-    echo "Enalbe repos"
-    ${SUDO} dnf config-manager --enable "*"
-    ${SUDO} dnf config-manager --disable "media*"
-    ${SUDO} dnf install -y epel-release
-    ${SUDO} /usr/bin/crb enable
-else
-    echo "Repos are enabled"
-fi
+# set ${SUDO} conditionally
+SUDO=$(test $(id -u) -ne 0 && echo sudo)
+
+${SUDO} dnf install -y dnf-plugins-core
+${SUDO} dnf config-manager --set-enabled baseos appstream powertools \
+    || die "Failed to enable baseos and powertools"
+
+${SUDO} dnf install -y epel-release \
+    && /usr/bin/crb enable \
+    || die "Failed to enable EPEL"
+

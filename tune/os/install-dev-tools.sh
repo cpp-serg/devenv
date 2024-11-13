@@ -3,11 +3,21 @@
 SUDO=$([ $(id -u) -ne 0 ] && echo sudo)
 
 ${SUDO} dnf install -y \
+    tar \
+    make \
+    bzip2 \
+    unzip \
+    python3 \
+    sqlite \
+    dos2unix \
+    lbzip2 \
+    git \
+    cmake \
+    gcc-c++ \
+    ninja-build \
+    ccache\
     gcc-toolset-13-gcc-c++ \
     gcc-toolset-13-gdb \
     gcc-toolset-13-libasan-devel \
     libxml2-devel \
-    openssl-devel \
-    ninja-build \
-    cmake \
-    ccache
+    openssl-devel
