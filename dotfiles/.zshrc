@@ -83,7 +83,10 @@ if [[ -d "/opt/rh/gcc-toolset-13" ]] ; then
     if [[ -d "/opt/rh/gcc-toolset-13/root/usr/share/man" ]] ; then
         export MANPATH="$MANPATH:/opt/rh/gcc-toolset-13/root/usr/share/man"
     fi
-    if [[ -f /opt/rh/gcc-toolset-13/root/bin/gdb ]]; then
+    if [[ -f /opt/rh/gcc-toolset-14/root/bin/gdb ]]; then
+        export SYSTEMD_DEBUGGER=/opt/rh/gcc-toolset-14/root/bin/gdb
+        alias gdb='/opt/rh/gcc-toolset-14/root/usr/bin/gdb'
+    elif [[ -f /opt/rh/gcc-toolset-13/root/bin/gdb ]]; then
         export SYSTEMD_DEBUGGER=/opt/rh/gcc-toolset-13/root/bin/gdb
         alias gdb='/opt/rh/gcc-toolset-13/root/usr/bin/gdb'
     fi
