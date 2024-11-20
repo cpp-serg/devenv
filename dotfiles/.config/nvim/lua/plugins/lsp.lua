@@ -97,8 +97,8 @@ return {
             local useMason = true
             local clangPath = 'clangd'
 
-            if vim.fn.executable('/opt/llvm-18/bin/clangd') == 1 then
-                clangPath = "/opt/llvm-18/bin/clangd"
+            if vim.fn.executable('/opt/llvm-19/bin/clangd') == 1 then
+                clangPath = "/opt/llvm-19/bin/clangd"
                 useMason = false
             elseif  vim.fn.executable('clangd') == 1 then
                 useMason = false
@@ -138,7 +138,7 @@ return {
                         "--suggest-missing-includes",
                         -- "--resource-dir="
                         "--log=error",
-                        "--query-driver=/opt/rh/gcc-toolset-10/root/bin/g++,/usr/bin/**/clang-*,/bin/clang,/bin/clang++,/usr/bin/gcc,/usr/bin/g++,/opt/llvm-18/bin/clang,/opt/llvm-18/bin/clang++",
+                        "--query-driver=/opt/rh/gcc-toolset-10/root/bin/g++,/usr/bin/**/clang-*,/bin/clang,/bin/clang++,/usr/bin/gcc,/usr/bin/g++,/opt/llvm-19/bin/clang,/opt/llvm-19/bin/clang++",
                         -- "--query-driver=/usr/bin/g++", 
                     },
                 },
