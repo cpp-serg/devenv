@@ -143,7 +143,7 @@ return {
                     },
                 },
                 -- gopls = {},
-                -- pyright = {},
+                pyright = {},
                 -- rust_analyzer = {},
                 -- ... etc. See `:help lspconfig-all` for a list of all the pre-configured LSPs
                 --
@@ -209,6 +209,7 @@ return {
             ensure_installed['clangd'] = nil -- We use the custom clangd configuration above
             vim.list_extend(ensure_installed, {
                 'stylua', -- Used to format lua code
+                'pyright',
             })
             require('mason-tool-installer').setup({
                 ensure_installed = ensure_installed,
