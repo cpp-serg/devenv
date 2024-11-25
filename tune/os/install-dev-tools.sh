@@ -17,7 +17,7 @@ ${SUDO} dnf install -y \
     ninja-build \
     ccache\
     gcc-toolset-13-gcc-c++ \
-    gcc-toolset-13-gdb \
+    gcc-toolset-14-gdb \
     gcc-toolset-13-libasan-devel \
     libxml2-devel \
     openssl-devel
