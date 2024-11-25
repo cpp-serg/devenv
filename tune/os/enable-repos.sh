@@ -8,11 +8,11 @@ function die {
 # set ${SUDO} conditionally
 SUDO=$(test $(id -u) -ne 0 && echo sudo)
 
-${SUDO} dnf install -y dnf-plugins-core
-${SUDO} dnf config-manager --set-enabled baseos appstream powertools \
-    || die "Failed to enable baseos and powertools"
+dnf install -y --enablerepo="baseos" dnf-plugins-core 
 
-${SUDO} dnf install -y epel-release \
+${SUDO} dnf install -y --enablerepo="devel" --enablerepo="extras" epel-release \
     && /usr/bin/crb enable \
-    || die "Failed to enable EPEL"
+    || die "Failed to isntall/enable EPEL"
 
+${SUDO} dnf config-manager --set-enabled "baseos*" "appstream*" "powertools*" "extras" "devel" "epel*" \
+    || die "Failed to enable repos"
