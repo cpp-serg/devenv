@@ -75,6 +75,10 @@ HAVE_NODE=$(HaveTool node)
 HAVE_TMUX=$(HaveTool tmux)
 HAVE_LAZYGIT=$(HaveTool lazygit)
 
+if [[ -d "/home/spastukhov/.local/bin" ]] ; then
+    export PATH="/home/spastukhov/.local/bin:$PATH"
+fi
+
 [[ -f ~/.config/.pythonrc ]] && export PYTHONSTARTUP=~/.config/.pythonrc
 [[ -f  ${HOME}/.cargo/env ]] && source "${HOME}/.cargo/env"
 [[ -f ~/.ripgreprc        ]] && export RIPGREP_CONFIG_PATH=~/.ripgreprc
