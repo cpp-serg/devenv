@@ -277,8 +277,8 @@ function mcssh
 
 zstyle -e ':completion:*:(mcssh):hosts' hosts 'reply=(${=${${(f)"$(cat {/etc/ssh_,~/.ssh/known_}hosts(|2)(N) /dev/null)"}%%[# ]*}//,/ })'
 
-if [[ -d /home/spastukhov/build-tools/vcpkg ]]; then
-    export VCPKG_ROOT=/home/spastukhov/build-tools/vcpkg
+if [[ -d ~/vcpkg ]]; then
+    export VCPKG_ROOT=~/vcpkg
     export PATH=$PATH:${VCPKG_ROOT}
     autoload bashcompinit
     bashcompinit
