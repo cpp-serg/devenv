@@ -1,3 +1,8 @@
+OriginalGruvboxDark0 = nil
+
+-- High contrast version of Gruvbox dark
+HCGruvboxDark0 = "#101010"
+
 return {
     'zaldih/themery.nvim',
     dependencies = {
@@ -8,6 +13,11 @@ return {
         'rose-pine/neovim',
         'rebelot/kanagawa.nvim'
     },
+
+    init = function()
+        OriginalGruvboxDark0 = require('gruvbox').palette.dark0
+    end,
+
     config = function()
         require('themery').setup({
             themes = {
@@ -32,7 +42,18 @@ return {
                 {
                     name = 'Gruvbox dark',
                     colorscheme = 'gruvbox',
-                    before = [[ vim.opt.background = "dark" ]],
+                    before = [[
+                        vim.opt.background = "dark"
+                        require('gruvbox').palette.dark0 = OriginalGruvboxDark0
+                    ]],
+                },
+                {
+                    name = 'Gruvbox dark high contrast',
+                    colorscheme = 'gruvbox',
+                    before = [[
+                        vim.opt.background = "dark"
+                        require('gruvbox').palette.dark0 = HCGruvboxDark0
+                    ]],
                 },
                 {
                     name = 'default dark',
