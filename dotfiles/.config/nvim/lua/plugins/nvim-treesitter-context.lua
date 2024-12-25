@@ -1,5 +1,6 @@
 return {
     'nvim-treesitter/nvim-treesitter-context',
+    enabled = not vim.g.vscode,
     opts = {
         enable = false, -- Enable this plugin (Can be enabled/disabled later via commands)
         max_lines = 6, -- How many lines the window should span. Values <= 0 mean no limit.

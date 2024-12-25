@@ -1,7 +1,7 @@
 return {
 
   'github/copilot.vim',
-  enabled = false,
+  enabled = false and not vim.g.vscode,
   opt = {
   }
 }

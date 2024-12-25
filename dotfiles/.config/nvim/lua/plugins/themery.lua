@@ -5,6 +5,7 @@ HCGruvboxDark0 = "#101010"
 
 return {
     'zaldih/themery.nvim',
+    enabled = vim.g.vscode,
     dependencies = {
         'loctvl842/monokai-pro.nvim',
         'ellisonleao/gruvbox.nvim',

@@ -186,16 +186,18 @@ end
 
 -- stylua: ignore
 local function SetKeymap()
-    local whichKey = require('which-key')
+    local standalone = not vim.g.vscode
+
+    local whichKey = standalone and require('which-key') or nil
+    local teleBuiltin = standalone and require('telescope.builtin') or nil
+    local gitSigns = standalone and require('gitsigns.actions') or nil
+    local harpoonMarks = standalone and require('harpoon.mark') or nil
+
     local addGroup = function(spec)
-        whichKey.add({spec})
+        if whichKey then whichKey.add({ spec }) end
     end
 
     local addKey = vim.keymap.set
-
-    local teleBuiltin = require('telescope.builtin')
-    local gitSigns = require('gitsigns.actions')
-    local harpoonMarks = require('harpoon.mark')
 
     addGroup { "<leader>c", group = "[C]ode" }
     addGroup { "<leader>d", group = "[D]ocument" }
@@ -244,22 +246,28 @@ local function SetKeymap()
     addKey('n', '<C-j>', '<C-w><C-j>', { desc = 'Move focus to the lower window' })
     addKey('n', '<C-k>', '<C-w><C-k>', { desc = 'Move focus to the upper window' })
 
+    if standalone then
+        addKey('n', '<leader>ff'      , teleBuiltin.find_files                     , { desc = 'File search' })
+        addKey('n', '<leader>gr'      , teleBuiltin.grep_string                    , { desc = 'Grep over current string' })
+        addKey('n', '<leader>fg'      , teleBuiltin.live_grep                      , { desc = 'Live grep' })
+        addKey('n', '<leader>bb'      , teleBuiltin.buffers                        , { desc = 'Telescope buffers' })
+        addKey('n', '<leader>qq'      , teleBuiltin.quickfix                       , { desc = 'Telescope quickfix' })
 
-    addKey('n', '<leader>ff'      , teleBuiltin.find_files                     , { desc = 'File search' })
-    addKey('n', '<leader>gr'      , teleBuiltin.grep_string                    , { desc = 'Grep over current string' })
-    addKey('n', '<leader>fg'      , teleBuiltin.live_grep                      , { desc = 'Live grep' })
-    addKey('n', '<leader>bb'      , teleBuiltin.buffers                        , { desc = 'Telescope buffers' })
-    addKey('n', '<leader>qq'      , teleBuiltin.quickfix                       , { desc = 'Telescope quickfix' })
+        addKey('n', '<leader>ss'      , teleBuiltin.lsp_document_symbols           , { desc = 'Telescope document symbols' })
+        addKey('n', '<leader>sw'      , teleBuiltin.lsp_workspace_symbols          , { desc = 'Telescope workspace symbols' })
+        addKey('n', 'gR'              , teleBuiltin.lsp_references                 , { desc = 'Telescope references' })
+    end
 
-    addKey('n', '<leader>ss'      , teleBuiltin.lsp_document_symbols           , { desc = 'Telescope document symbols' })
-    addKey('n', '<leader>sw'      , teleBuiltin.lsp_workspace_symbols          , { desc = 'Telescope workspace symbols' })
-    addKey('n', 'gR'              , teleBuiltin.lsp_references                 , { desc = 'Telescope references' })
     addKey('n', 'gr'              , '<cmd>Glance references<CR>'               , { desc = 'Glance references' })
-    addKey('n', '<leader>dd'      , teleBuiltin.diagnostics                    , { desc = 'Telescope workspace diagnostic' })
-    addKey('n', '<leader>gb'      , teleBuiltin.git_branches                   , { desc = 'Telescope git branches' })
-    addKey('n', '<leader><leader>', teleBuiltin.resume                         , { desc = 'Resume last Telescope session' })
 
-    addKey('n', '<leader>th'      , '<cmd>Themery<cr>'                         , { desc = 'Themery' })
+    if standalone then
+        addKey('n', '<leader>dd'      , teleBuiltin.diagnostics                    , { desc = 'Telescope workspace diagnostic' })
+        addKey('n', '<leader>gb'      , teleBuiltin.git_branches                   , { desc = 'Telescope git branches' })
+        addKey('n', '<leader><leader>', teleBuiltin.resume                         , { desc = 'Resume last Telescope session' })
+
+        addKey('n', '<leader>th'      , '<cmd>Themery<cr>'                         , { desc = 'Themery' })
+    end
+
     addKey('n', '<leader>o'       , vim.cmd.only                               , { desc = 'Leave only current window' })
 
     -- Plug 'p00f/clangd_extensions.nvim'
@@ -269,12 +277,15 @@ local function SetKeymap()
 
     -- Git stuff
     addKey('n', '<leader>gg'      , '<cmd>0G<cr>'                              , { desc = 'Fugitive' })
-    addKey('n', '<leader>gs'      , teleBuiltin.git_status                     , { desc = 'Telescope git status' })
-    addKey('n', '<leader>gS'      , gitSigns.stage_hunk                        , { desc = 'Stage current hunk' })
-    addKey('n', 'gp'              , gitSigns.preview_hunk                      , { desc = 'Preview hunk' })
-    addKey('n', '<leader>nh'      , gitSigns.next_hunk                         , { desc = 'Next hunk' })
-    addKey('n', '<leader>ph'      , gitSigns.prev_hunk                         , { desc = 'Previous hunk' })
-    addKey('n', '<leader>gR'      , gitSigns.reset_hunk                        , { desc = 'Reset hunk' })
+
+    if standalone then
+        addKey('n', '<leader>gs'      , teleBuiltin.git_status                     , { desc = 'Telescope git status' })
+        addKey('n', '<leader>gS'      , gitSigns.stage_hunk                        , { desc = 'Stage current hunk' })
+        addKey('n', 'gp'              , gitSigns.preview_hunk                      , { desc = 'Preview hunk' })
+        addKey('n', '<leader>nh'      , gitSigns.next_hunk                         , { desc = 'Next hunk' })
+        addKey('n', '<leader>ph'      , gitSigns.prev_hunk                         , { desc = 'Previous hunk' })
+        addKey('n', '<leader>gR'      , gitSigns.reset_hunk                        , { desc = 'Reset hunk' })
+    end
 
     addKey('n', '<C-K>'           , FormatCurrentLine                          , { desc = 'Apply ClangFormat' })
     addKey('v', '<C-K>'           , vim.lsp.buf.format                         , { desc = 'Apply ClangFormat' })
@@ -286,7 +297,11 @@ local function SetKeymap()
     addKey('n', '<leader>M'       , '<cmd>wa<cr><cmd>terminal ./build.sh --no-unittests <cr>'  , { desc = 'Build current config in terminal' })
     addKey('n', '<leader>D'       , '<cmd>wa<cr><cmd>terminal ./build.sh --no-unittests && deploy-to<cr>'  , { desc = 'Build current config in terminal and deploy to remote host' })
 
-    addKey('n', '<leader>ha'      , harpoonMarks.add_file                      , { desc = 'Harpoon add file' })
+    if standalone then
+        addKey('n', '<leader>ha'      , harpoonMarks.add_file                      , { desc = 'Harpoon add file' })
+        addKey('n', '<leader>hl'      , '<cmd>Telescope harpoon marks<cr>'         , { desc = 'Harpoon telescope' })
+        addKey('n', '<leader>ha'      , harpoonMarks.add_file                      , { desc = 'Harpoon add file' })
+    end
     addKey('n', '<leader>hl'      , '<cmd>Telescope harpoon marks<cr>'         , { desc = 'Harpoon telescope' })
 
     addKey('n', '<leader>tt'      , '<cmd>TSContextToggle<cr>'                 , { desc = 'Toggle Tresitter context' })

@@ -1,5 +1,6 @@
 return { -- Useful plugin to show you pending keybinds.
     'folke/which-key.nvim',
+    enabled = not vim.g.vscode,
     event = 'VimEnter', -- Sets the loading event to 'VimEnter'
     init = function()
         vim.o.timeout = true
