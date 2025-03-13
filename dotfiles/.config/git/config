@@ -63,3 +63,8 @@
 	directory = /home/pente/5g-broker/conf
 	directory = /home/pente/ggsn/conf
 	directory = /opt/kafka/config
+[filter "lfs"]
+	clean = git-lfs clean -- %f
+	smudge = git-lfs smudge -- %f
+	process = git-lfs filter-process
+	required = true
