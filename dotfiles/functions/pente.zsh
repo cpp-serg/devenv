@@ -29,10 +29,12 @@ function changeGwUser {
 
 
 function linkCustomBins {
+    buildRoot=${1:-/root/ggsn}
+    echo "Using custom binaries from ${buildRoot}"
     for binary in GGSN/ggsn SGW/cp/sgw_cp SGW/up/sgw_up
     do
         bin=$(basename $binary)
-        ln -sf /root/ggsn/build/current/${binary} /home/pente/ggsn/bin/${bin}-custom
+        ln -sf ${buildRoot}/build/current/${binary} /home/pente/ggsn/bin/${bin}-custom
     done
 }
 
@@ -91,6 +93,7 @@ function gwstatus() {
 }
 
 function useCustomBins {
+    buildRoot=${1:-/root/ggsn}
     for binary in ggsn sgw_cp sgw_up
     do
         if [[ ! -L /home/pente/ggsn/bin/${binary} ]]; then
@@ -102,7 +105,7 @@ function useCustomBins {
     for binary in ggsn sgw_cp sgw_up
     do
         if [[ ! -L /home/pente/ggsn/bin/${binary}-custom ]]; then
-            linkCustomBins
+            linkCustomBins ${buildRoot}
             break
         fi
     done
