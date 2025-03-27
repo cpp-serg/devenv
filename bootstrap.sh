@@ -12,6 +12,7 @@ git remote set-url origin git@github.com:cpp-serg/devenv.git
 
 ${SUDO} ~/devenv/tune/os/enable-repos.sh
 ${SUDO} ~/devenv/tune/os/install-soft.sh
+${SUDO} ~/devenv/tune/os/configure-services.sh
 
 if ! type zsh >/dev/null 2>&1; then
     ${SUDO} dnf install -y zsh
