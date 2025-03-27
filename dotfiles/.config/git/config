@@ -56,12 +56,11 @@
 [rebase]
 	updateRefs = true
 [safe]
-	directory = /home/pente/ggsn/conf
-	directory = /home/pente/mmed/conf
-	directory = /home/pente/amfd/conf
-	directory = /home/pente/gtp-broker/conf
 	directory = /home/pente/5g-broker/conf
+	directory = /home/pente/amfd/conf
 	directory = /home/pente/ggsn/conf
+	directory = /home/pente/gtp-broker/conf
+	directory = /home/pente/mmed/conf
 	directory = /opt/kafka/config
 [filter "lfs"]
 	clean = git-lfs clean -- %f
