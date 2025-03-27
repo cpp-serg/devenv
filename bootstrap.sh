@@ -16,7 +16,7 @@ ${SUDO} ~/devenv/tune/os/configure-services.sh
 
 if ! type zsh >/dev/null 2>&1; then
     ${SUDO} dnf install -y zsh
-    chsh -s /bin/zsh
+    # chsh -s /bin/zsh
 fi
 
 RUNZSH=no sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
