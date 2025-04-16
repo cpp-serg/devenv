@@ -2,7 +2,7 @@ local isSpPrivate = vim.fn.filereadable('~/.sp-private-host') == 1
 -- disable netrw at the very start of init.lua, so nvim-tree takes care of file navigation
 vim.g.loaded_netrw = 1
 vim.g.loaded_netrwPlugin = 1
-
+vim.env.LANG = 'en_US.UTF-8'
 -- User Config
 -- ---
 vim.g.user = {

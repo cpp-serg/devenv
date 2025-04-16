@@ -1,5 +1,6 @@
 return {
   "folke/persistence.nvim",
+  enabled = not vim.g.vscode,
   event = "BufReadPre",
   opts = { options = vim.opt.sessionoptions:get() },
   -- stylua: ignore
