@@ -1,0 +1,4 @@
+*.sh text eol=lf
+*.py text eol=lf
+*.lua text eol=lf
+*.vim text eol=lf
