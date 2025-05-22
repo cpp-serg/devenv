@@ -15,6 +15,7 @@
     #bt ="!git lg --simplify-by-decoration"
     bt ="!git lga2 --simplify-by-decoration"
     lg3 = log --graph --abbrev-commit --decorate --format=format:'%C(bold blue)%h%C(reset) - %C(bold cyan)%aD%C(reset) %C(bold green)(%ar)%C(reset)%C(bold yellow)%d%C(reset)%n''          %C(white)%s%C(reset) %C(dim white)- %an%C(reset)' --all
+    ddiff="!git -c core.pager=less diff"
 [core]
     #pager = less -S
     pager = delta
@@ -68,3 +69,5 @@
 	smudge = git-lfs smudge -- %f
 	process = git-lfs filter-process
 	required = true
+[color]
+	ui = true
