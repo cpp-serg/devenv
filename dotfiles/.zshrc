@@ -294,10 +294,15 @@ if [[ -f /bin/zsh ]]; then
     export SHELL=/bin/zsh
 fi
 
+PENTE_EDGE_ID=$(jq -r '.edge.edgeId' /home/pente/auc/conf/config.json 2>/dev/null)
+# TEMP old AUC configs
+[[ -z "${PENTE_EDGE_ID}" ]] && PENTE_EDGE_ID=$(grep -i  'EdgeId' /home/pente/auc/conf/config.properties 2>/dev/null | grep -oE '[0-9]+$')
+PENTE_HOST_IP=$(ip a show nic0 2>/dev/nulg | sed -nE "s/.*inet ([^\/]+)\/.*/\1/p")
+
 [[ -f ~/.local-functions.zsh ]] && source ~/.local-functions.zsh
 [[ -f ~/.zshrc.local ]] && source ~/.zshrc.local
 
-PENTE_EDGE_ID=$(grep -i  'EdgeId' /home/pente/auc/conf/config.properties 2>/dev/null | grep -oE '[0-9]+$')
+
 if [[ -n "${PENTE_EDGE_ID}" ]]; then
     export RPS1="%{$fg_bold[red]%}$(hostname)(E:${PENTE_EDGE_ID})%{$reset_color%}"
 else
@@ -305,5 +310,6 @@ else
 fi
 
 [[ -n "${PENTE_HOST_IP}" ]] && RPS1="${RPS1} - ${PENTE_HOST_IP}"
+[[ -n "${PENTE_HOST_TAG}" ]] && RPS1="${RPS1} - ${PENTE_HOST_TAG}"
 
 alias vim='nvim'
