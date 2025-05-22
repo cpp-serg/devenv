@@ -21,6 +21,7 @@
 [interactive]
     diffFilter = delta --color-only --features=interactive
 [delta]
+    pager = less -RS
     features = interactive
     features = catppuccin-mocha
     features = decorations
