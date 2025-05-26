@@ -1,3 +1,8 @@
+
+function pgwGetId() {
+    grep -v "#" /home/pente/ggsn/bin/pgw.uuid 2>/dev/null
+}
+
 # change user in pente units for PGW/SGW.
 # Also change log directory
 # Usage: changeGwUser [user_to=root]
