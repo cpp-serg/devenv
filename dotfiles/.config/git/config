@@ -19,6 +19,7 @@
 [core]
     #pager = less -S
     pager = delta
+    autocrlf = true
 [interactive]
     diffFilter = delta --color-only --features=interactive
 [delta]
@@ -56,18 +57,20 @@
 [branch]
     sort = -committerdate
 [rebase]
-	updateRefs = true
+    updateRefs = true
 [safe]
-	directory = /home/pente/5g-broker/conf
-	directory = /home/pente/amfd/conf
-	directory = /home/pente/ggsn/conf
-	directory = /home/pente/gtp-broker/conf
-	directory = /home/pente/mmed/conf
-	directory = /opt/kafka/config
+    directory = /home/pente/5g-broker/conf
+    directory = /home/pente/amfd/conf
+    directory = /home/pente/ggsn/conf
+    directory = /home/pente/gtp-broker/conf
+    directory = /home/pente/mmed/conf
+    directory = /opt/kafka/config
 [filter "lfs"]
-	clean = git-lfs clean -- %f
-	smudge = git-lfs smudge -- %f
-	process = git-lfs filter-process
-	required = true
+    clean = git-lfs clean -- %f
+    smudge = git-lfs smudge -- %f
+    process = git-lfs filter-process
+    required = true
 [color]
-	ui = true
+    ui = true
+[diff]
+    autocrlf = true
