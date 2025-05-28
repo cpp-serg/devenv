@@ -23,7 +23,6 @@ IS_SP_PRIVATE_HOST=$(HaveFile ${HOME}/.sp-private-host)
 TOOL_ROOTS=(
     /opt/tools
     /opt/llvm-19
-    /opt/ccache
     ${HOME}/.local
     /opt/valgrind
     /opt/asn1c
