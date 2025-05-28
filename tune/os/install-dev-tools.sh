@@ -12,6 +12,7 @@ ${SUDO} dnf install -y \
     dos2unix \
     lbzip2 \
     git \
+    git-lfs \
     cmake \
     gcc-c++ \
     ninja-build \
