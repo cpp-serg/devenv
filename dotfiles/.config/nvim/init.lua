@@ -282,6 +282,7 @@ local function SetKeymap()
 
     if standalone then
         addKey('n', '<leader>gs'      , teleBuiltin.git_status                     , { desc = 'Telescope git status' })
+        addKey('n', '<leader>gB'      , gitSigns.toggle_current_line_blame         , { desc = 'Toggle current line blame' })
         addKey('n', '<leader>gS'      , gitSigns.stage_hunk                        , { desc = 'Stage current hunk' })
         addKey('n', 'gp'              , gitSigns.preview_hunk                      , { desc = 'Preview hunk' })
         addKey('n', '<leader>nh'      , gitSigns.next_hunk                         , { desc = 'Next hunk' })
