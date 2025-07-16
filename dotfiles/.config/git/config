@@ -19,7 +19,6 @@
 [core]
     #pager = less -S
     pager = delta
-    autocrlf = true
 [interactive]
     diffFilter = delta --color-only --features=interactive
 [delta]
