@@ -273,7 +273,7 @@ local function SetKeymap()
     addKey('n', '<leader>o'       , vim.cmd.only                               , { desc = 'Leave only current window' })
 
     -- Plug 'p00f/clangd_extensions.nvim'
-    addKey('n', '<leader>hh'      , '<cmd>ClangdSwitchSourceHeader<cr>'        , { desc = 'Switch cpp/h' })
+    addKey('n', '<leader>hh'      , '<cmd>LspClangdSwitchSourceHeader<cr>'        , { desc = 'Switch cpp/h' })
     addKey('n', '<leader>rr'      , vim.lsp.buf.rename                         , { desc = 'Rename current symbol' })
     addKey('n', '<leader>ii'      , ToggleInlineHints                          , { desc = 'Toggle inlay hints' })
 
