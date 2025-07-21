@@ -1,5 +1,5 @@
-USER=Administrator
-PASS=admin123
+CB_USER=Administrator
+CB_PASS=admin123
 
 HOST=127.0.0.1
 BUCKET=JPUHLR
@@ -43,7 +43,7 @@ function cb-q
     fi
 
     #Get first arg of exit with error
-    cbq -q -u $USER -p $PASS -script "$*;" $HOST
+    cbq -q -u $CB_USER -p $CB_PASS -script "$*;" $HOST
 }
 
 function cb-all-keys
