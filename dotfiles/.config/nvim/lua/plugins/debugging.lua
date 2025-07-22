@@ -109,6 +109,7 @@ return {
           end,
         },
       }
+    dap.configurations.c = dap.configurations.cpp
     end,
   },
 }
