@@ -99,7 +99,12 @@ if [[ -d /opt/couchbase ]]; then
     alias cbq="/opt/couchbase/bin/cbq"
 fi
 
-$HAVE_DELTA && export DELTA_FEATURES=+side-by-side
+if $HAVE_DELTA; then
+    export DELTA_FEATURES=+side-by-side
+    export GIT_PAGER='delta'
+else
+    export GIT_PAGER='less -RS'
+fi
 
 #export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/usr/local/python-3.11.3/lib/"
 
