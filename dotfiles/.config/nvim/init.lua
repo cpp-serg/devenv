@@ -244,15 +244,6 @@ local function SetKeymap()
         addKey('n', '<down>' , '<cmd>echo "Use j to move!!"<cr>j')
     end
 
-    -- Keybinds to make split navigation easier.
-    --  Use CTRL+<hjkl> to switch between windows
-    --
-    --  See `:help wincmd` for a list of all window commands
-    addKey('n', '<C-h>', '<C-w><C-h>', { desc = 'Move focus to the left window' })
-    addKey('n', '<C-l>', '<C-w><C-l>', { desc = 'Move focus to the right window' })
-    addKey('n', '<C-j>', '<C-w><C-j>', { desc = 'Move focus to the lower window' })
-    addKey('n', '<C-k>', '<C-w><C-k>', { desc = 'Move focus to the upper window' })
-
     if standalone then
         addKey('n', '<leader>ff'      , teleBuiltin.find_files                     , { desc = 'File search' })
         addKey('n', '<leader>gr'      , teleBuiltin.grep_string                    , { desc = 'Grep over current string' })
@@ -295,8 +286,8 @@ local function SetKeymap()
         addKey('n', '<leader>gR'      , gitSigns.reset_hunk                        , { desc = 'Reset hunk' })
     end
 
-    addKey('n', '<C-K>'           , FormatCurrentLine                          , { desc = 'Apply ClangFormat' })
-    addKey('v', '<C-K>'           , vim.lsp.buf.format                         , { desc = 'Apply ClangFormat' })
+    addKey('n', '<leader>cf'      , FormatCurrentLine                          , { desc = 'Apply ClangFormat' })
+    addKey('v', '<leader>cf'      , vim.lsp.buf.format                         , { desc = 'Apply ClangFormat' })
 
     addKey('n', '<leader>ll'      , ToggleLinesOnOff                           , { desc = 'Toggle lines on off' })
     addKey('n', '<leader>lr'      , '<cmd>set relativenumber!<cr>'             , { desc = 'Toggle relativenuber' })
