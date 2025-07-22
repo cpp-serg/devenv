@@ -2,3 +2,5 @@ set history save on
 set history expansion on
 set debuginfod enabled on
 set print pretty on
+set print demangle on
+set auto-load safe-path /
