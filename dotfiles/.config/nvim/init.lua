@@ -177,6 +177,11 @@ local function ToggleLinesOnOff()
     vim.wo.relativenumber = not vim.wo.relativenumber
 end
 
+vim.diagnostic.config({virtual_lines = true})
+local function ToggleVirtualLines()
+    vim.diagnostic.config({virtual_lines = not vim.diagnostic.config().virtual_lines})
+end
+
 local function FormatCurrentLine()
     vim.lsp.buf.format({
         range = {
@@ -308,6 +313,7 @@ local function SetKeymap()
     addKey('n', '<leader>hl'      , '<cmd>Telescope harpoon marks<cr>'         , { desc = 'Harpoon telescope' })
 
     addKey('n', '<leader>tt'      , '<cmd>TSContextToggle<cr>'                 , { desc = 'Toggle Tresitter context' })
+    addKey('n', '<leader>vl'      , ToggleVirtualLines                        , { desc = 'Toggle virtual lines' })
 end
 
 SetKeymap()
