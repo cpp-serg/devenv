@@ -143,8 +143,6 @@ return {
                         -- "--query-driver=/usr/bin/g++", 
                     },
                 },
-                -- gopls = {},
-                pyright = {},
                 -- rust_analyzer = {},
                 -- ... etc. See `:help lspconfig-all` for a list of all the pre-configured LSPs
                 --
@@ -194,11 +192,15 @@ return {
                     filetypes = {'go'},
                 }
             end
+            local haveNode = vim.fn.executable('node') == 1
 
             if vim.fn.executable('jinja') == 1 or vim.fn.executable('jinja2') == 1 then
                 servers['jinja_lsp']={
                     filetypes = {'jinja'},
                 }
+            end
+            if haveNode then
+                servers['pyright'] = { }
             end
 
             -- Ensure the servers and tools above are installed
@@ -216,8 +218,14 @@ return {
             ensure_installed['clangd'] = nil -- We use the custom clangd configuration above
             vim.list_extend(ensure_installed, {
                 'stylua', -- Used to format lua code
-                'pyright',
             })
+
+            if haveNode then
+                vim.list_extend(ensure_installed, {
+                    'pyright',
+                })
+            end
+
             require('mason-tool-installer').setup({
                 ensure_installed = ensure_installed,
             })
