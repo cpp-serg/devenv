@@ -301,7 +301,7 @@ fi
 PENTE_EDGE_ID=$(jq -r '.edge.edgeId' /home/pente/auc/conf/config.json 2>/dev/null)
 # TEMP old AUC configs
 [[ -z "${PENTE_EDGE_ID}" ]] && PENTE_EDGE_ID=$(grep -i  'EdgeId' /home/pente/auc/conf/config.properties 2>/dev/null | grep -oE '[0-9]+$')
-PENTE_HOST_IP=$(ip a show nic0 2>/dev/nulg | sed -nE "s/.*inet ([^\/]+)\/.*/\1/p")
+PENTE_HOST_IP=$(ip a show nic0 2>/dev/null | sed -nE "s/.*inet ([^\/]+)\/.*/\1/p")
 
 [[ -f ~/.local-functions.zsh ]] && source ~/.local-functions.zsh
 [[ -f ~/.zshrc.local ]] && source ~/.zshrc.local
