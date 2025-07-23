@@ -301,9 +301,9 @@ local function SetKeymap()
         addKey('n', '<leader>hl'      , '<cmd>Telescope harpoon marks<cr>'         , { desc = 'Harpoon telescope' })
         addKey('n', '<leader>ha'      , harpoonMarks.add_file                      , { desc = 'Harpoon add file' })
     end
-    addKey('n', '<leader>hl'      , '<cmd>Telescope harpoon marks<cr>'         , { desc = 'Harpoon telescope' })
+    addKey('n', '<leader>hl'      , '<cmd>Telescope harpoon marks<cr>'        , { desc = 'Harpoon telescope' })
 
-    addKey('n', '<leader>tt'      , '<cmd>TSContextToggle<cr>'                 , { desc = 'Toggle Tresitter context' })
+    addKey('n', '<leader>tt'      , '<cmd>TSContext toggle<cr>'               , { desc = 'Toggle Tresitter context' })
     addKey('n', '<leader>vl'      , ToggleVirtualLines                        , { desc = 'Toggle virtual lines' })
 end
 
