@@ -1,7 +1,7 @@
 return {
     'nvim-telescope/telescope.nvim',
     enabled = not vim.g.vscode,
-    tag = '0.1.5',
+    -- tag = '0.1.5',
     dependencies = {
         'nvim-lua/plenary.nvim',
         { -- If encountering errors, see telescope-fzf-native README for install instructions
@@ -20,17 +20,6 @@ return {
         { 'nvim-telescope/telescope-ui-select.nvim' },
         { 'nvim-tree/nvim-web-devicons', enabled = vim.g.have_nerd_font },
     },
-    --[[
-    opts={
-        defaults = {
-            layout = 'vertical',
-            layout_config={width=0.99,height=0.99},
-        },
-        pickers = {
-            lsp_code_actions = { theme = "cursor" },
-        },
-    },
-    ]]
     config = function()
         require('telescope').setup {
             defaults = {
@@ -52,6 +41,9 @@ return {
                     mappings = {
                         i = { ['<c-K>'] = require('telescope.actions').delete_buffer},
                     },
+                },
+                lsp_document_symbols = {
+                    symbol_width = 120,
                 },
             },
             -- You can put your default mappings / updates / etc. in here
