@@ -329,6 +329,10 @@ local function SetKeymap()
 
     addKey('n', '<leader>tt'      , '<cmd>TSContext toggle<cr>'               , { desc = 'Toggle Tresitter context' })
     addKey('n', '<leader>vl'      , ToggleVirtualLines                        , { desc = 'Toggle virtual lines' })
+    addKey('n', '<leader>c1'      , vim.cmd.cfirst                        , { desc = 'cnext' })
+    addKey('n', '<leader>cw'      , vim.cmd.cwindow                        , { desc = 'cnext' })
+    addKey('n', '<leader>cj'      , vim.cmd.cnext                        , { desc = 'cnext' })
+    addKey('n', '<leader>ck'      , vim.cmd.cprev                        , { desc = 'cnext' })
 end
 
 SetKeymap()
