@@ -43,7 +43,31 @@ vim.opt.listchars = { tab = '⇥‧', trail = '˽', extends = '⯈', precedes = 
 
 vim.opt.mouse = 'a'
 vim.opt.showmode = false
-vim.opt.clipboard = 'unnamedplus'
+
+-- Clipboard support
+vim.opt.clipboard:append('unnamedplus') -- use clipboard for copy/paste
+-- if (os.getenv('SSH_TTY') ~= nil and os.getenv('TMUX') == nil)
+if (os.getenv('TMUX') == nil)
+then
+    local function my_paste()
+      return {
+        vim.fn.split(vim.fn.getreg(''), '\n'),
+        vim.fn.getregtype(''),
+      }
+    end
+    local osc52 = require("vim.ui.clipboard.osc52")
+    vim.g.clipboard = {
+      name = "OSC 52",
+      copy = {
+        ["+"] = osc52.copy("+"),
+        ["*"] = osc52.copy("*"),
+      },
+      paste = {
+        ["+"] = my_paste,
+        ["*"] = my_paste,
+      },
+    }
+end
 
 vim.opt.breakindent = true
 
