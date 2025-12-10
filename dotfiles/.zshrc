@@ -1,6 +1,10 @@
 export SP_DEVENV_ROOT="${HOME}/devenv"
 export SP_DOTFILES_ROOT="${SP_DEVENV_ROOT}/dotfiles"
 
+function devenv_run_git {
+    git -C ${SP_DEVENV_ROOT} "$@"
+}
+
 function HaveTool {
     if (( $+commands[$1] )); then
         echo true
