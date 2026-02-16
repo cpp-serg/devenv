@@ -11,4 +11,5 @@ ${SUDO} dnf install -y util-linux-user git git-lfs tar bzip2 unzip python3 sqlit
 ${INSTALL_DIR}/install-cmake.sh
 ${INSTALL_DIR}/install-tmux.sh
 ${INSTALL_DIR}/install-neovim.sh
+${MY_DIR}/dotfiles/fzf/install --bin
 

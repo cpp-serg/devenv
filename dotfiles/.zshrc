@@ -40,6 +40,12 @@ TOOL_ROOTS=(
 
 export PATH=$PATH:~/devenv/scripts
 
+# Setup fzf
+if [[ -f ${SP_DOTFILES_ROOT}/fzf/bin/fzf ]]; then
+    SP_FZF_ROOT=${SP_DOTFILES_ROOT}/fzf
+    PATH="${PATH:+${PATH}:}${SP_FZF_ROOT}/bin"
+fi
+
 ADDED_PATHS=""
 ADDED_MANPATHS=""
 for tool in "${TOOL_ROOTS[@]}" ; do
@@ -86,14 +92,19 @@ fi
 [[ -f  ${HOME}/.cargo/env ]] && source "${HOME}/.cargo/env"
 [[ -f ~/.ripgreprc        ]] && export RIPGREP_CONFIG_PATH=~/.ripgreprc
 
-if [[ -d "/opt/rh/gcc-toolset-13" ]] ; then
-    if [[ -d "/opt/rh/gcc-toolset-13/root/usr/share/man" ]] ; then
-        export MANPATH="$MANPATH:/opt/rh/gcc-toolset-13/root/usr/share/man"
+if [[ -d "/opt/rh/gcc-toolset-14" ]] ; then
+    if [[ -d "/opt/rh/gcc-toolset-14/root/usr/share/man" ]] ; then
+        export MANPATH="$MANPATH:/opt/rh/gcc-toolset-14/root/usr/share/man"
     fi
     if [[ -f /opt/rh/gcc-toolset-14/root/bin/gdb ]]; then
         export SYSTEMD_DEBUGGER=/opt/rh/gcc-toolset-14/root/bin/gdb
         alias gdb='/opt/rh/gcc-toolset-14/root/usr/bin/gdb'
-    elif [[ -f /opt/rh/gcc-toolset-13/root/bin/gdb ]]; then
+    fi
+elif [[ -d "/opt/rh/gcc-toolset-13" ]] ; then
+    if [[ -d "/opt/rh/gcc-toolset-13/root/usr/share/man" ]] ; then
+        export MANPATH="$MANPATH:/opt/rh/gcc-toolset-13/root/usr/share/man"
+    fi
+    if [[ -f /opt/rh/gcc-toolset-13/root/bin/gdb ]]; then
         export SYSTEMD_DEBUGGER=/opt/rh/gcc-toolset-13/root/bin/gdb
         alias gdb='/opt/rh/gcc-toolset-13/root/usr/bin/gdb'
     fi
@@ -181,7 +192,7 @@ HIST_STAMPS="yyyy-mm-dd"
 # ZSH_CUSTOM=/path/to/new-custom-folder
 plugins=(cp yum dnf pip)
 
-$HAVE_FZF && plugins+=(fzf)
+# $HAVE_FZF && plugins+=(fzf) # no need as we use native fzf integration
 $HAVE_GIT && plugins+=(git)
 $HAVE_GO && plugins+=(golang)
 $HAVE_DOCKER && plugins+=(docker docker-compose)
@@ -203,11 +214,20 @@ setopt HIST_EXPIRE_DUPS_FIRST
 setopt HIST_FIND_NO_DUPS
 fpath+=${ZSH_CUSTOM:-${ZSH:-~/.oh-my-zsh}/custom}/plugins/zsh-completions/src
 if $HAVE_FZF; then
-    FZF_BASE=/home/spastukhov/install_soft/fzf/
     export FZF_DEFAULT_OPTS='--height=~90% --ansi --preview "bat --color=always --line-range :500 {}" --preview-window=right:wrap'
     #export FZF_DEFAULT_OPTS='--ansi --preview "bat --color=always --style=header,grid --line-range :500 {}" --preview-window=down:3:wrap'
     #export FZF_DEFAULT_OPTS='--height 40% --layout=reverse --border --ansi --preview "bat --color=always --style=header,grid --line-range :500 {}" --preview-window=down:3:wrap'
-    alias vimf='vim $(fzf)'
+    source <(fzf --zsh) # integrate fzf into zsh
+    __fzf_git_fzf='function _fzf_git_fzf() {
+        fzf --height 50% --tmux 95%,95% \
+          --layout reverse --multi --min-height 20+ --border \
+          --no-separator --header-border horizontal \
+          --border-label-pos 2 \
+          --color ''label:blue'' \
+          --preview-window ''right,70%'' --preview-border line \
+          --bind ''ctrl-/:change-preview-window\(down,50%\|hidden\|\)'' "$@"
+        }'
+   source ${SP_DOTFILES_ROOT}/fzf-git/fzf-git.sh
 fi
 source $ZSH/oh-my-zsh.sh
 
@@ -321,3 +341,4 @@ fi
 [[ -n "${PENTE_HOST_TAG}" ]] && RPS1="${RPS1} - ${PENTE_HOST_TAG}"
 
 alias vim='nvim'
+
