@@ -13,3 +13,9 @@
 [submodule "dotfiles/zsh_custom/plugins/zsh-syntax-highlighting"]
 	path = dotfiles/zsh_custom/plugins/zsh-syntax-highlighting
 	url = https://github.com/zsh-users/zsh-syntax-highlighting.git
+[submodule "dotfiles/fzf-git"]
+	path = dotfiles/fzf-git
+	url = https://github.com/junegunn/fzf-git.sh.git
+[submodule "dotfiles/fzf"]
+	path = dotfiles/fzf
+	url = https://github.com/junegunn/fzf.git
