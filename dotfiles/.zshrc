@@ -214,6 +214,8 @@ source $ZSH/lib/history.zsh
 setopt HIST_EXPIRE_DUPS_FIRST
 setopt HIST_FIND_NO_DUPS
 fpath+=${ZSH_CUSTOM:-${ZSH:-~/.oh-my-zsh}/custom}/plugins/zsh-completions/src
+source $ZSH/oh-my-zsh.sh
+
 if $HAVE_FZF; then
     export FZF_DEFAULT_OPTS='--height=~90% --ansi --preview "bat --color=always --line-range :500 {}" --preview-window=right:wrap'
     #export FZF_DEFAULT_OPTS='--ansi --preview "bat --color=always --style=header,grid --line-range :500 {}" --preview-window=down:3:wrap'
@@ -230,7 +232,6 @@ if $HAVE_FZF; then
         }'
    source ${SP_DOTFILES_ROOT}/fzf-git/fzf-git.sh
 fi
-source $ZSH/oh-my-zsh.sh
 
 export ZSH_AUTOSUGGEST_STRATEGY=(history completion)
 # User configuration
@@ -330,7 +331,6 @@ PENTE_HOST_IP=$(ip a show nic0 2>/dev/null | sed -nE "s/.*inet ([^\/]+)\/.*/\1/p
 
 [[ -f ~/.local-functions.zsh ]] && source ~/.local-functions.zsh
 [[ -f ~/.zshrc.local ]] && source ~/.zshrc.local
-
 
 if [[ -n "${PENTE_EDGE_ID}" ]]; then
     export RPS1="%{$fg_bold[red]%}$(hostname)(E:${PENTE_EDGE_ID})%{$reset_color%}"
