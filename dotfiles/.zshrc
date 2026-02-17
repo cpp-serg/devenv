@@ -39,6 +39,7 @@ TOOL_ROOTS=(
 
 
 export PATH=$PATH:~/devenv/scripts
+[[ -d "${HOME}/.local/bin" ]] && export PATH="$HOME/.local/bin:$PATH"
 
 # Setup fzf
 if [[ -f ${SP_DOTFILES_ROOT}/fzf/bin/fzf ]]; then
@@ -219,7 +220,7 @@ if $HAVE_FZF; then
     #export FZF_DEFAULT_OPTS='--height 40% --layout=reverse --border --ansi --preview "bat --color=always --style=header,grid --line-range :500 {}" --preview-window=down:3:wrap'
     source <(fzf --zsh) # integrate fzf into zsh
     __fzf_git_fzf='function _fzf_git_fzf() {
-        fzf --height 50% --tmux 95%,95% \
+        fzf --height 70% --tmux 95%,95% \
           --layout reverse --multi --min-height 20+ --border \
           --no-separator --header-border horizontal \
           --border-label-pos 2 \
