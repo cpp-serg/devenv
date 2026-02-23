@@ -11,22 +11,27 @@ return { -- Highlight, edit, and navigate code
                 'dockerfile',
                 'html',
                 'lua',
+                'python',
+                'groovy',
                 'markdown',
                 'query',
                 'rst',
                 'vim',
                 'vimdoc',
             },
-            auto_install = true,
             highlight = { enable = true },
             indent = { enable = true },
         },
+        config = function(_, opts)
+            require 'nvim-treesitter'.install(opts.ensure_installed)
+        end,
     },
     {
         'nvim-treesitter/nvim-treesitter-textobjects',
+        branch = "main",
         dependencies = { 'nvim-treesitter/nvim-treesitter' },
         config = function()
-            require('nvim-treesitter-textobjects').setup({
+            require('nvim-treesitter-textobjects').setup {
                 select = {
                     lookahead = true,
                     selection_modes = {
@@ -37,7 +42,7 @@ return { -- Highlight, edit, and navigate code
                     },
                     include_surrounding_whitespace = false,
                 },
-            })
+            }
 
             local select = require('nvim-treesitter-textobjects.select').select_textobject
             vim.keymap.set({ 'x', 'o' }, 'af', function() select('@function.outer', 'textobjects') end)
@@ -47,7 +52,6 @@ return { -- Highlight, edit, and navigate code
             vim.keymap.set({ 'x', 'o' }, 'as', function() select('@statement.outer', 'textobjects') end)
             vim.keymap.set({ 'x', 'o' }, 'ap', function() select('@parameter.outer', 'textobjects') end)
             vim.keymap.set({ 'x', 'o' }, 'ab', function() select('@block.outer', 'textobjects') end)
-
         end,
     },
 }
