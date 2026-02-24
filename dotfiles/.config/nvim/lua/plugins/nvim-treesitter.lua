@@ -9,6 +9,7 @@ return { -- Highlight, edit, and navigate code
                 'cmake',
                 'cpp',
                 'dockerfile',
+                'gitcommit',
                 'html',
                 'lua',
                 'python',
