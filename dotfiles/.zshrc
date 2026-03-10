@@ -84,6 +84,7 @@ HAVE_DELTA=$(HaveTool delta)
 HAVE_NODE=$(HaveTool node)
 HAVE_TMUX=$(HaveTool tmux)
 HAVE_LAZYGIT=$(HaveTool lazygit)
+HAVE_PICKSSH=$(HaveTool pick-ssh)
 
 if [[ -d "/home/spastukhov/.local/bin" ]] ; then
     export PATH="/home/spastukhov/.local/bin:$PATH"
@@ -255,7 +256,7 @@ export LANG=en_US.UTF-8
 export EDITOR='nvim'
 CORRECT_IGNORE_FILE='release'
 
-alias please='sudo $(fc -ln -1)'
+alias tma='tmux attach'
 
 if $HAVE_GIT; then
     alias glg='git lg'
@@ -337,4 +338,9 @@ fi
 [[ -n "${PENTE_HOST_TAG}" ]] && RPS1="${RPS1} - ${PENTE_HOST_TAG}"
 
 alias vim='nvim'
+
+if $HAVE_PICKSSH; then
+    source <(pick-ssh --embed zsh)
+    export PICK_SSH_CONFIG="theme=catppuccin-mocha"
+fi
 
