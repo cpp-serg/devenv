@@ -17,6 +17,8 @@ return { -- Highlight, edit, and navigate code
                 'markdown',
                 'query',
                 'rst',
+                'rust',
+                'toml',
                 'vim',
                 'vimdoc',
             },
