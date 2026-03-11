@@ -1,3 +1,5 @@
+export SP_MASTER_USER="spastukhov"
+
 export SP_DEVENV_ROOT="${HOME}/devenv"
 export SP_DOTFILES_ROOT="${SP_DEVENV_ROOT}/dotfiles"
 
@@ -5,25 +7,30 @@ function devenv_run_git {
     git -C ${SP_DEVENV_ROOT} "$@"
 }
 
-function HaveTool {
-    if (( $+commands[$1] )); then
-        echo true
-    else
-        echo false
-    fi
-}
-
 function HaveFile {
-    if [[ -f $1 ]]; then
-        echo true
-    else
-        echo false
-    fi
+    [[ -f $1 ]] && echo true || echo false
 }
-
 
 IS_SP_PRIVATE_HOST=$(HaveFile ${HOME}/.sp-private-host)
 
+export PATH="$PATH:~/devenv/scripts"
+[[ -d "${HOME}/.local/bin" ]] && export PATH="$HOME/.local/bin:$PATH"
+
+# If I'm running as a different user, still bring tools from master user (if accessible)
+if [[ ("${USER}" != "${SP_MASTER_USER}") && (-x "/home/${SP_MASTER_USER}") ]]; then
+    for path in .local/bin .local/devenv/scripts; do
+        [[ -x "/home/${SP_MASTER_USER}/${path}" ]] && export PATH="/home/${SP_MASTER_USER}/${path}:$PATH"
+    done
+fi
+
+# Setup fzf
+if [[ -f ${SP_DOTFILES_ROOT}/fzf/bin/fzf ]]; then
+    SP_FZF_ROOT=${SP_DOTFILES_ROOT}/fzf
+    PATH="${PATH:+${PATH}:}${SP_FZF_ROOT}/bin"
+fi
+
+ADDED_PATHS=""
+ADDED_MANPATHS=""
 TOOL_ROOTS=(
     /opt/tools
     /opt/llvm-19
@@ -37,42 +44,33 @@ TOOL_ROOTS=(
     /opt/go
 )
 
-
-export PATH=$PATH:~/devenv/scripts
-[[ -d "${HOME}/.local/bin" ]] && export PATH="$HOME/.local/bin:$PATH"
-
-# Setup fzf
-if [[ -f ${SP_DOTFILES_ROOT}/fzf/bin/fzf ]]; then
-    SP_FZF_ROOT=${SP_DOTFILES_ROOT}/fzf
-    PATH="${PATH:+${PATH}:}${SP_FZF_ROOT}/bin"
-fi
-
-ADDED_PATHS=""
-ADDED_MANPATHS=""
 for tool in "${TOOL_ROOTS[@]}" ; do
-    if [[ -d "${tool}/bin" ]] ; then
-        ADDED_PATHS="${ADDED_PATHS}:${tool}/bin"
-        if [[ -d "${tool}/man" ]] ; then
-            ADDED_MANPATHS="${ADDED_MANPATHS}:${tool}/man"
-        elif [[ -d "${tool}/doc" ]] ; then
-            ADDED_MANPATHS="${ADDED_MANPATHS}:${tool}/doc"
-        elif [[ -d "${tool}/share/man" ]] ; then
-            ADDED_MANPATHS="${ADDED_MANPATHS}:${tool}/share/man"
-        fi
-    elif [[ -d "${tool}" ]]; then
+    [[ -d "${tool}" && -x "${tool}" ]] || continue
+
+    if [[ ! -d "${tool}/bin" ]] ; then
+        # simple tool dir, no docs, man etc.
         ADDED_PATHS="${ADDED_PATHS}:${tool}"
+        continue
+    fi
+
+    ADDED_PATHS="${ADDED_PATHS}:${tool}/bin"
+    if [[ -d "${tool}/man" ]] ; then
+        ADDED_MANPATHS="${ADDED_MANPATHS}:${tool}/man"
+    elif [[ -d "${tool}/doc" ]] ; then
+        ADDED_MANPATHS="${ADDED_MANPATHS}:${tool}/doc"
+    elif [[ -d "${tool}/share/man" ]] ; then
+        ADDED_MANPATHS="${ADDED_MANPATHS}:${tool}/share/man"
     fi
 done
 
-if [[ ! -z "${ADDED_PATHS}" ]] ; then
-    export PATH=$PATH:${ADDED_PATHS}
-fi
-
-if [[ ! -z "${ADDED_MANPATHS}" ]] ; then
-    export MANPATH=${MANPATH}:${ADDED_MANPATHS}
-fi
+[[ ! -z "${ADDED_PATHS}" ]] && export PATH=$PATH:${ADDED_PATHS}
+[[ ! -z "${ADDED_MANPATHS}" ]] && export MANPATH=${MANPATH}:${ADDED_MANPATHS}
 
 # Must be after ADDED_PATHS stuff
+function HaveTool {
+    (( $+commands[$1] )) && echo true || echo false
+}
+
 HAVE_GIT=$(HaveTool git)
 HAVE_FZF=$(HaveTool fzf)
 HAVE_RIPGREP=$(HaveTool rg)
@@ -87,50 +85,28 @@ HAVE_LAZYGIT=$(HaveTool lazygit)
 HAVE_PICKSSH=$(HaveTool pick-ssh)
 HAVE_LXD=$(HaveTool lxc)
 
-if [[ -d "/home/spastukhov/.local/bin" ]] ; then
-    export PATH="/home/spastukhov/.local/bin:$PATH"
-fi
-
 [[ -f ~/.config/.pythonrc ]] && export PYTHONSTARTUP=~/.config/.pythonrc
-[[ -f  ${HOME}/.cargo/env ]] && source "${HOME}/.cargo/env"
+[[ -f ${HOME}/.cargo/env  ]] && source "${HOME}/.cargo/env"
 [[ -f ~/.ripgreprc        ]] && export RIPGREP_CONFIG_PATH=~/.ripgreprc
 
-if [[ -d "/opt/rh/gcc-toolset-14" ]] ; then
-    if [[ -d "/opt/rh/gcc-toolset-14/root/usr/share/man" ]] ; then
-        export MANPATH="$MANPATH:/opt/rh/gcc-toolset-14/root/usr/share/man"
-    fi
-    if [[ -f /opt/rh/gcc-toolset-14/root/bin/gdb ]]; then
-        export SYSTEMD_DEBUGGER=/opt/rh/gcc-toolset-14/root/bin/gdb
-        alias gdb='/opt/rh/gcc-toolset-14/root/usr/bin/gdb'
-    fi
-elif [[ -d "/opt/rh/gcc-toolset-13" ]] ; then
-    if [[ -d "/opt/rh/gcc-toolset-13/root/usr/share/man" ]] ; then
-        export MANPATH="$MANPATH:/opt/rh/gcc-toolset-13/root/usr/share/man"
-    fi
-    if [[ -f /opt/rh/gcc-toolset-13/root/bin/gdb ]]; then
-        export SYSTEMD_DEBUGGER=/opt/rh/gcc-toolset-13/root/bin/gdb
-        alias gdb='/opt/rh/gcc-toolset-13/root/usr/bin/gdb'
-    fi
-fi
 
-if [[ -d /opt/couchbase ]]; then
-    alias cbq="/opt/couchbase/bin/cbq"
-fi
+for gcc_toolset_ver in 15 14 13; do
+    toolset_root="/opt/rh/gcc-toolset-${gcc_toolset_ver}/root"
+    [[ ! -d "${toolset_root}" ]] && continue
 
-#export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/usr/local/python-3.11.3/lib/"
+    [[ -d "${toolset_root}/usr/share/man" ]] && export MANPATH="$MANPATH:${toolset_root}/usr/share/man"
+    if [[ -f "${toolset_root}/bin/gdb" ]]; then
+        export SYSTEMD_DEBUGGER="${toolset_root}/bin/gdb"
+        alias gdb="${toolset_root}/usr/bin/gdb"
+    fi
+done
+
+[[ -d /opt/couchbase ]] && alias cbq="/opt/couchbase/bin/cbq"
 
 # Path to your oh-my-zsh installation.
 export ZSH="$HOME/.oh-my-zsh"
 
-# Set name of the theme to load --- if set to "random", it will
-# load a random theme each time oh-my-zsh is loaded, in which case,
-# to know which specific one was loaded, run: echo $RANDOM_THEME
-# See https://github.com/ohmyzsh/ohmyzsh/wiki/Themes
-if $IS_SP_PRIVATE_HOST; then
-    ZSH_THEME="robbyrussell"
-else
-    ZSH_THEME="amuse"
-fi
+ZSH_THEME=$(${IS_SP_PRIVATE_HOST} && echo "robbyrussell" || echo "amuse")
 
 # Set list of themes to pick from when loading at random
 # Setting this variable when ZSH_THEME=random will cause zsh to load
@@ -188,13 +164,13 @@ HIST_STAMPS="yyyy-mm-dd"
 # ZSH_CUSTOM=/path/to/new-custom-folder
 plugins=(cp yum dnf pip)
 
-# $HAVE_FZF && plugins+=(fzf) # no need as we use native fzf integration
 $HAVE_GIT && plugins+=(git)
 $HAVE_GO && plugins+=(golang)
 $HAVE_DOCKER && plugins+=(docker docker-compose)
 $HAVE_RUST && plugins+=(rust)
 $HAVE_NODE && plugins+=(node npm)
 $HAVE_TMUX && plugins+=(tmux)
+# $HAVE_FZF && plugins+=(fzf) # no need as we use native fzf integration
 
 ZSH_CUSTOM=${SP_DOTFILES_ROOT}/zsh_custom
 
@@ -204,7 +180,6 @@ done
 
 HISTSIZE=250000
 SAVEHIST=100000
-ZSH_PECO_HISTORY_DEDUP=1
 source $ZSH/lib/history.zsh
 setopt HIST_EXPIRE_DUPS_FIRST
 setopt HIST_FIND_NO_DUPS
@@ -231,35 +206,11 @@ fi
 $HAVE_LXD && source <(lxc completion zsh)
 
 export ZSH_AUTOSUGGEST_STRATEGY=(history completion)
-# User configuration
 
-# export MANPATH="/usr/local/man:$MANPATH"
-
-# You may need to manually set your language environment
 export LANG=en_US.UTF-8
 
-# Preferred editor for local and remote sessions
-# if [[ -n $SSH_CONNECTION ]]; theno
-#   export EDITOR='vim'
-# else
-#   export EDITOR='mvim'
-# fi
-
-# Compilation flags
-# export ARCHFLAGS="-arch x86_64"
-
-# Set personal aliases, overriding those provided by oh-my-zsh libs,
-# plugins, and themes. Aliases can be placed here, though oh-my-zsh
-# users are encouraged to define aliases within the ZSH_CUSTOM folder.
-# For a full list of active aliases, run `alias`.
-#
-# Example aliases
-# alias zshconfig="mate ~/.zshrc"
-# alias ohmyzsh="mate ~/.oh-my-zsh"
 export EDITOR='nvim'
 CORRECT_IGNORE_FILE='release'
-
-alias tma='tmux attach'
 
 if $HAVE_GIT; then
     alias glg='git lg'
@@ -273,8 +224,6 @@ fi
 
 $HAVE_LAZYGIT && alias lg='lazygit'
 
-alias vimdiff='nvim -d'
-
 compdef _gnu_generic build.sh
 compdef _gnu_generic asn1c
 
@@ -284,6 +233,11 @@ if $HAVE_DELTA; then
     source <(delta --generate-completion zsh)
 else
     export GIT_PAGER='less -RS'
+fi
+
+if $HAVE_PICKSSH; then
+    source <(pick-ssh --embed zsh)
+    export PICK_SSH_CONFIG="theme=catppuccin-mocha"
 fi
 
 function changeTps {
@@ -323,10 +277,15 @@ if [[ -f /bin/zsh ]]; then
     export SHELL=/bin/zsh
 fi
 
-PENTE_EDGE_ID=$(jq -r '.edge.edgeId' /home/pente/auc/conf/config.json 2>/dev/null)
+
 # TEMP old AUC configs
 [[ -z "${PENTE_EDGE_ID}" ]] && PENTE_EDGE_ID=$(grep -i  'EdgeId' /home/pente/auc/conf/config.properties 2>/dev/null | grep -oE '[0-9]+$')
-PENTE_HOST_IP=$(ip a show nic0 2>/dev/null | sed -nE "s/.*inet ([^\/]+)\/.*/\1/p")
+
+# find first interface from given list with an IP
+for nic in nic0 br0 eth0; do
+    PENTE_HOST_IP=$(ip a show ${nic} 2>/dev/null | sed -nE "s/.*inet ([^\/]+)\/.*/\1/p" | head -n1)
+    [[ -n "${PENTE_HOST_IP}" ]] && break
+done
 
 [[ -f ~/.local-functions.zsh ]] && source ~/.local-functions.zsh
 [[ -f ~/.zshrc.local ]] && source ~/.zshrc.local
@@ -341,9 +300,6 @@ fi
 [[ -n "${PENTE_HOST_TAG}" ]] && RPS1="${RPS1} - ${PENTE_HOST_TAG}"
 
 alias vim='nvim'
-
-if $HAVE_PICKSSH; then
-    source <(pick-ssh --embed zsh)
-    export PICK_SSH_CONFIG="theme=catppuccin-mocha"
-fi
+alias tma='tmux attach'
+alias vimdiff='nvim -d'
 
