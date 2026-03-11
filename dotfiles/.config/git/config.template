@@ -1,0 +1,7 @@
+[include]
+    path=config.shared
+
+[safe]
+    ; local specific
+
+; vim: set ft=gitconfig :

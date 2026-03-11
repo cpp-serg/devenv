@@ -12,7 +12,7 @@
     lg2 ="!git logpretty --graph"
     lga2 ="!git lg2 --exclude='refs/prefetch/*' --all"
     lga ="!git lga2 --first-parent"
-    #bt ="!git lg --simplify-by-decoration"
+    ; bt ="!git lg --simplify-by-decoration"
     bt ="!git lga2 --simplify-by-decoration"
     lg3 = log --graph --abbrev-commit --decorate --format=format:'%C(bold blue)%h%C(reset) - %C(bold cyan)%aD%C(reset) %C(bold green)(%ar)%C(reset)%C(bold yellow)%d%C(reset)%n''          %C(white)%s%C(reset) %C(dim white)- %an%C(reset)' --all
     ddiff="!git -c core.pager=less diff"
@@ -38,9 +38,9 @@
     hunk-header-file-style = red
     hunk-header-line-number-style = "#067a00"
     hunk-header-style = file line-number syntax
-    # syntax-theme = gruvbox-dark
-    #syntax-theme = "Monokai Extended"
-    #syntax-theme = GitHub
+    ; syntax-theme = gruvbox-dark
+    ; syntax-theme = "Monokai Extended"
+    ; syntax-theme = GitHub
     syntax-theme = gruvbox-dark
     keep-plus-minus-markers = true
 [gc]
@@ -58,14 +58,13 @@
 [rebase]
     updateRefs = true
 [safe]
-    directory = /home/pente/5g-broker/conf
-    directory = /home/pente/amfd/conf
-    directory = /home/pente/ggsn/conf
-    directory = /home/pente/gtp-broker/conf
-    directory = /home/pente/mmed/conf
-    directory = /home/pente/network-monitors
-    directory = /home/pente/pente-server
+    ; pente specific
+    directory = /home/pente/
     directory = /opt/kafka/config
+    directory = ~/ggsn*/
+    directory = ~/mme/
+    directory = ~/amf/
+    directory = ~/open5gs/
 [filter "lfs"]
     clean = git-lfs clean -- %f
     smudge = git-lfs smudge -- %f
@@ -75,3 +74,5 @@
     ui = true
 [diff]
     autocrlf = true
+
+; vim: set ft=gitconfig :

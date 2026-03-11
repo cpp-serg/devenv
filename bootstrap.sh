@@ -23,6 +23,7 @@ RUNZSH=no sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/
 mv ~/.zshrc ~/.zshrc.orig
 
 ${TARGET_ROOT}/dotfiles/set-links.sh
+cp $TARGET_ROOT/dotfiles/.config/git/config{.template,}
 
 zsh
 
