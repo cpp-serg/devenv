@@ -115,13 +115,6 @@ if [[ -d /opt/couchbase ]]; then
     alias cbq="/opt/couchbase/bin/cbq"
 fi
 
-if $HAVE_DELTA; then
-    export DELTA_FEATURES=+side-by-side
-    export GIT_PAGER='delta'
-else
-    export GIT_PAGER='less -RS'
-fi
-
 #export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/usr/local/python-3.11.3/lib/"
 
 # Path to your oh-my-zsh installation.
@@ -277,15 +270,17 @@ fi
 $HAVE_LAZYGIT && alias lg='lazygit'
 
 alias vimdiff='nvim -d'
-#unset '_comps[delta]'
-_comps[delta]=_delta
-
-function sg {
-    rg $* | delta
-}
 
 compdef _gnu_generic build.sh
 compdef _gnu_generic asn1c
+
+if $HAVE_DELTA; then
+    export DELTA_FEATURES=+side-by-side
+    export GIT_PAGER='delta'
+    source <(delta --generate-completion zsh)
+else
+    export GIT_PAGER='less -RS'
+fi
 
 function changeTps {
     VER=$1
