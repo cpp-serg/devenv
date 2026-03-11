@@ -85,6 +85,7 @@ HAVE_NODE=$(HaveTool node)
 HAVE_TMUX=$(HaveTool tmux)
 HAVE_LAZYGIT=$(HaveTool lazygit)
 HAVE_PICKSSH=$(HaveTool pick-ssh)
+HAVE_LXD=$(HaveTool lxc)
 
 if [[ -d "/home/spastukhov/.local/bin" ]] ; then
     export PATH="/home/spastukhov/.local/bin:$PATH"
@@ -226,6 +227,8 @@ if $HAVE_FZF; then
         }'
    source ${SP_DOTFILES_ROOT}/fzf-git/fzf-git.sh
 fi
+
+$HAVE_LXD && source <(lxc completion zsh)
 
 export ZSH_AUTOSUGGEST_STRATEGY=(history completion)
 # User configuration
