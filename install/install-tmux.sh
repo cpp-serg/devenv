@@ -1,5 +1,5 @@
 #!/bin/bash
-TMUX_VER=3.4
+TMUX_VER=3.6a
 
 # set ${SUDO} conditionally
 SUDO=$([ $(id -u) -ne 0 ] && echo sudo)
