@@ -248,6 +248,10 @@ local function SetKeymap()
     addKey('n', '<leader>X'    , '<cmd>bdelete!<cr>')
     addKey('n', '<leader>bO'   , '<cmd>BufferLineCloseOthers<cr>')
 
+    -- Exit terminal mode with Esc
+    addKey('t', '<Esc>', '<C-\\><C-n>', { desc = 'Exit terminal mode' })
+    addKey('t', '<C-h>', function() vim.api.nvim_set_current_win(vim.fn.win_getid(vim.fn.winnr('h'))) end, { desc = 'Move to left window' })
+
     -- Diagnostic keymaps
     addKey('n', '[d'       , vim.diagnostic.goto_prev , { desc = 'Go to previous [D]iagnostic message' })
     addKey('n', ']d'       , vim.diagnostic.goto_next , { desc = 'Go to next [D]iagnostic message' })
