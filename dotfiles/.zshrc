@@ -84,6 +84,7 @@ HAVE_TMUX=$(HaveTool tmux)
 HAVE_LAZYGIT=$(HaveTool lazygit)
 HAVE_PICKSSH=$(HaveTool pick-ssh)
 HAVE_LXD=$(HaveTool lxc)
+HAVE_LXD=$(HaveTool claude)
 
 [[ -f ~/.config/.pythonrc ]] && export PYTHONSTARTUP=~/.config/.pythonrc
 [[ -f ${HOME}/.cargo/env  ]] && source "${HOME}/.cargo/env"
@@ -226,6 +227,7 @@ $HAVE_LAZYGIT && alias lg='lazygit'
 
 compdef _gnu_generic build.sh
 compdef _gnu_generic asn1c
+$HAVE_CLAUDE && compdef _gnu_generic claude
 
 if $HAVE_DELTA; then
     export DELTA_FEATURES=+side-by-side
