@@ -1,15 +1,25 @@
 #!/bin/bash
 
+set -euo pipefail
+
 function die() {
   echo "$1" 1>&2
   exit 1
 }
 
-LATEST=$(curl -fsSL "https://go.dev/dl/?mode=json" | grep -o '"version":"go[^"]*"' | head -1 | cut -d'"' -f4)
-[ -n "$LATEST" ] || die "Failed to determine latest Go version"
+ARCH=$(uname -m)
+case "$ARCH" in
+  x86_64)  GOARCH="amd64" ;;
+  aarch64) GOARCH="arm64" ;;
+  *)       die "Unsupported architecture: $ARCH" ;;
+esac
 
-ARCHIVE="${LATEST}.linux-amd64.tar.gz"
+LATEST=$(curl -fsSL "https://go.dev/dl/?mode=json" | jq -r '.[0].version')
+[ -n "$LATEST" ] && [ "$LATEST" != "null" ] || die "Failed to determine latest Go version"
 
+ARCHIVE="${LATEST}.linux-${GOARCH}.tar.gz"
+
+echo "Installing ${LATEST} for linux/${GOARCH}..."
 curl -fsSL "https://go.dev/dl/${ARCHIVE}" -o /tmp/go.tar.gz || die "Failed to download Go"
 
 rm -rf /usr/local/go
