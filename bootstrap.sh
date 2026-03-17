@@ -5,6 +5,7 @@ TARGET_ROOT=~/devenv
 
 # set ${SUDO} conditionally
 SUDO=$([ $(id -u) -ne 0 ] && echo sudo)
+${SUDO} dnf install -y git
 
 git clone --recursive -j10 https://github.com/cpp-serg/devenv.git ${TARGET_ROOT}
 cd ${TARGET_ROOT}

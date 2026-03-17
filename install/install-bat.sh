@@ -1,6 +1,8 @@
 #!/bin/bash
 
-function die() {
+SUDO=$([ $(id -u) -ne 0 ] && echo sudo)
+
+die() {
   echo "$1" 1>&2
   exit 1
 }
@@ -9,6 +11,9 @@ function die() {
 
 cargo install bat || die "Failed to install bat"
 
-cp "$HOME/.cargo/bin/bat" /opt/tools/ && chmod 755 /opt/tools/bat
+[[ ! -d /opt/tools ]] && ${SUDO} mkdir /opt/tools
+[[ ! -x /opt/tools ]] && ${SUDO} chmod a+rx /opt/tools
+
+${SUDO} cp "$HOME/.cargo/bin/bat" /opt/tools/ && ${SUDO} chmod 755 /opt/tools/bat
 
 echo "bat $(bat --version) installed successfully"
