@@ -3,6 +3,8 @@ export SP_MASTER_USER="spastukhov"
 export SP_DEVENV_ROOT="${HOME}/devenv"
 export SP_DOTFILES_ROOT="${SP_DEVENV_ROOT}/dotfiles"
 
+SUDO=$([ $(id -u) -ne 0 ] && echo sudo)
+
 function devenv_run_git {
     git -C ${SP_DEVENV_ROOT} "$@"
 }
@@ -13,7 +15,7 @@ function HaveFile {
 
 IS_SP_PRIVATE_HOST=$(HaveFile ${HOME}/.sp-private-host)
 
-export PATH="$PATH:~/devenv/scripts"
+export PATH="$PATH:$HOME/devenv/scripts"
 [[ -d "${HOME}/.local/bin" ]] && export PATH="$HOME/.local/bin:$PATH"
 
 # If I'm running as a different user, still bring tools from master user (if accessible)
@@ -303,5 +305,9 @@ fi
 
 alias vim='nvim'
 alias tma='tmux attach'
-alias vimdiff='nvim -d'
+alias vimd='nvim -d'
+alias ncdu="${SUDO} ncdu -x"
+alias df="${SUDO} df -h"
+alias du="${SUDO} du -h"
+alias reboot="${SUDO} reboot"
 
