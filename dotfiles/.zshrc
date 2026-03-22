@@ -310,6 +310,6 @@ alias ncdu="${SUDO} ncdu -x"
 alias df="${SUDO} df -h"
 alias du="${SUDO} du -h"
 alias reboot="${SUDO} reboot"
-alias cld='su - claude-runner -c "zsh -c -i claude --allow-dangerously-skip-permissions"'
+alias cld=$'su -l - claude-runner -c "zsh -ic \'cd $(pwd) && exec claude --allow-dangerously-skip-permissions\'"'
 alias cldp='su - claude-runner'
 
