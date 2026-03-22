@@ -1,5 +1,5 @@
 [include]
-    path=/home/spastukhov/.config/git/mocha.gitconfig
+    path=~/.config/git/mocha.gitconfig
 
 [credential]
     helper = store
