@@ -18,6 +18,11 @@ else
   die "Unsupported package manager"
 fi
 
+# Comment out SCTP blacklist entry if it exists
+if [[ -f /etc/modprobe.d/sctp-blacklist.conf ]]; then
+  ${SUDO} sed -i 's/^blacklist sctp/#blacklist sctp/' /etc/modprobe.d/sctp-blacklist.conf || die "Failed to comment out SCTP blacklist entry"
+fi
+
 # Load the SCTP module immediately
 ${SUDO} modprobe sctp || die "Failed to load SCTP module"
 
