@@ -309,9 +309,10 @@ local function SetKeymap()
         addKey('n', '<leader>gB'      , gitSigns.toggle_current_line_blame         , { desc = 'Toggle current line blame' })
         addKey('n', '<leader>gS'      , gitSigns.stage_hunk                        , { desc = 'Stage current hunk' })
         addKey('n', 'gp'              , gitSigns.preview_hunk                      , { desc = 'Preview hunk' })
-        addKey('n', '<leader>nh'      , gitSigns.next_hunk                         , { desc = 'Next hunk' })
-        addKey('n', '<leader>ph'      , gitSigns.prev_hunk                         , { desc = 'Previous hunk' })
+        addKey('n', '<leader>gn'      , gitSigns.next_hunk                         , { desc = 'Next hunk' })
+        addKey('n', '<leader>gp'      , gitSigns.prev_hunk                         , { desc = 'Previous hunk' })
         addKey('n', '<leader>gR'      , gitSigns.reset_hunk                        , { desc = 'Reset hunk' })
+        addKey('n', '<leader>sh'      , gitSigns.select_hunk                       , { desc = 'Select hunk' })
     end
 
     addKey('n', '<leader>cf'      , FormatCurrentLine                          , { desc = 'Apply ClangFormat' })
