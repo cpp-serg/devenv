@@ -20,8 +20,8 @@ export PATH="$PATH:$HOME/devenv/scripts"
 
 # If I'm running as a different user, still bring tools from master user (if accessible)
 if [[ ("${USER}" != "${SP_MASTER_USER}") && (-x "/home/${SP_MASTER_USER}") ]]; then
-    for path in .local/bin .local/devenv/scripts; do
-        [[ -x "/home/${SP_MASTER_USER}/${path}" ]] && export PATH="/home/${SP_MASTER_USER}/${path}:$PATH"
+    for p in .local/bin .local/devenv/scripts; do
+        [[ -x "/home/${SP_MASTER_USER}/${p}" ]] && export PATH="/home/${SP_MASTER_USER}/${p}:$PATH"
     done
 fi
 
