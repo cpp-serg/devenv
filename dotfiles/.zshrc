@@ -2,6 +2,7 @@ export SP_MASTER_USER="spastukhov"
 
 export SP_DEVENV_ROOT="${HOME}/devenv"
 export SP_DOTFILES_ROOT="${SP_DEVENV_ROOT}/dotfiles"
+export KEYTIMEOUT=100
 
 SUDO=$([ $(id -u) -ne 0 ] && echo sudo)
 
