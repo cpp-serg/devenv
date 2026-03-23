@@ -96,7 +96,7 @@ vim.opt.cursorline = true
 -- Minimal number of screen lines to keep above and below the cursor.
 vim.opt.scrolloff = 5
 
-vim.diagnostic.config({virtual_lines = true})
+vim.diagnostic.config({virtual_lines = false})
 
 vim.api.nvim_create_autocmd('TextYankPost', {
     desc = 'Highlight when yanking (copying) text',
@@ -235,6 +235,9 @@ local function SetKeymap()
     addGroup { "<leader>r", group = "[R]ename" }
     addGroup { "<leader>s", group = "[S]earch" }
     addGroup { "<leader>w", group = "[W]orkspace" }
+
+    vim.keymap.set("v", "<A-j>", ":move '>+1<CR>gv=gv")
+    vim.keymap.set("v", "<A-k>", ":move '<-2<CR>gv=gv")
 
     -- [[ Basic Keymaps ]]
     addKey('n', '<leader>CC', '<cmd>e ~/.config/nvim/init.lua<cr>', { desc = 'Edit nvim init' })
