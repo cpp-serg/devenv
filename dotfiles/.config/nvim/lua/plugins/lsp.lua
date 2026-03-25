@@ -19,6 +19,14 @@ return {
             vim.api.nvim_create_autocmd('LspAttach', {
                 group = vim.api.nvim_create_augroup('kickstart-lsp-attach', { clear = true }),
                 callback = function(event)
+                    local uri = vim.uri_from_bufnr(event.buf)
+                    if not uri or not uri:match('^file://') then
+                        vim.schedule(function()
+                            vim.lsp.buf_detach_client(event.buf, event.data.client_id)
+                        end)
+                        return
+                    end
+
                     local map = function(keys, func, desc)
                         vim.keymap.set('n', keys, func, {
                             buffer = event.buf,
