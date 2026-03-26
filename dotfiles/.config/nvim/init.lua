@@ -335,6 +335,10 @@ local function SetKeymap()
     end
     addKey('n', '<leader>hl'      , '<cmd>Telescope harpoon marks<cr>'        , { desc = 'Harpoon telescope' })
 
+    addKey('n', 'Y'               , function() return require('usr.yank_ref').yank_operator() end, { desc = 'Yank file ref + motion', expr = true })
+    addKey('v', 'Y'               , function() require('usr.yank_ref').yank_visual() end      , { desc = 'Yank file ref + selection' })
+    addKey('n', 'YY'              , function() require('usr.yank_ref').yank_line() end         , { desc = 'Yank file ref + current line' })
+
     addKey('n', '<leader>tt'      , '<cmd>TSContext toggle<cr>'               , { desc = 'Toggle Tresitter context' })
     addKey('n', '<leader>vl'      , ToggleVirtualLines                        , { desc = 'Toggle virtual lines' })
     addKey('n', '<leader>c1'      , vim.cmd.cfirst                        , { desc = 'cnext' })
