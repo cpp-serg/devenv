@@ -14,5 +14,5 @@ ${SUDO} dnf install -y --enablerepo="devel" --enablerepo="extras" epel-release \
     && /usr/bin/crb enable \
     || die "Failed to isntall/enable EPEL"
 
-${SUDO} dnf config-manager --set-enabled "baseos*" "appstream*" "powertools*" "extras" "devel" "epel*" \
+${SUDO} dnf config-manager --set-enabled "baseos*" "appstream*" "extras" "devel" "epel*" \
     || die "Failed to enable repos"
