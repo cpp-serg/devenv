@@ -1,0 +1,32 @@
+********************************
+*     HEADER DESCRIPTION       *
+********************************
+*
+Customer: JpU(Partner)
+*
+Quantity: 2000
+*
+Batch: 0003
+*
+Type: Plug-IN
+*
+Profile: JpU(Partner) Israel – USIM 2FF/3FF/4FF repluggable
+*
+Param_A: 030
+*
+Param_K: 211
+*
+Param_O: 010
+*******************************
+*   INPUT VARIABLES           *
+*******************************
+*
+Var_in_list:
+Ser_Nb: 89972114251107564000
+IMSI: 315010999976000
+MSISDN:899661001000
+***************************************
+*          OUTPUT VARIABLES           *
+***************************************
+var_out:ICCID/EKI/IMSI/PUK1/PUK2/PIN1/PIN2
+89972114251107564000 0240E9D3E830637176CF7C81304EF306 315010999976000 15115127 58028938 2954 2629
