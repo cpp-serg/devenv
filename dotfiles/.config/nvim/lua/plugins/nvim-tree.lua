@@ -5,6 +5,8 @@ return {
         { 'nvim-tree/nvim-web-devicons', enabled = vim.g.have_nerd_font },
     },
     opts = {
+        disable_netrw = false,
+        hijack_netrw = true,
         update_focused_file = {
             enable = true,
             update_cwd = false,
