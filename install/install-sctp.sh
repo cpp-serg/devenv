@@ -9,9 +9,9 @@ die() {
 
 # Install SCTP kernel module and development libraries
 if command -v dnf &>/dev/null; then
-  ${SUDO} dnf install -y kernel-modules-extra lksctp-tools lksctp-tools-devel || die "Failed to install SCTP packages"
+  ${SUDO} dnf install -y kernel-modules-extra-$(uname -r) lksctp-tools lksctp-tools-devel || die "Failed to install SCTP packages"
 elif command -v yum &>/dev/null; then
-  ${SUDO} yum install -y kernel-modules-extra lksctp-tools lksctp-tools-devel || die "Failed to install SCTP packages"
+  ${SUDO} yum install -y kernel-modules-extra-$(uname -r) lksctp-tools lksctp-tools-devel || die "Failed to install SCTP packages"
 elif command -v apt-get &>/dev/null; then
   ${SUDO} apt-get update && ${SUDO} apt-get install -y linux-modules-extra-$(uname -r) libsctp-dev lksctp-tools || die "Failed to install SCTP packages"
 else
