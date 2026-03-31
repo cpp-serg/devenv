@@ -21,6 +21,14 @@ is_physical_nic() {
 
 is_renamed() {
     local iface="$1"
+    local syspath="/sys/class/net/$iface"
+    # A NIC is NOT renamed if its current name matches any kernel predictable name
+    local name
+    for prop in ID_NET_NAME_PATH ID_NET_NAME_SLOT ID_NET_NAME_ONBOARD; do
+        name=$(udevadm info "$syspath" 2>/dev/null | awk -F= "/^E: ${prop}=/{print \$2}")
+        [[ "$name" == "$iface" ]] && return 1
+    done
+    # If none of the predictable names match, check if we can identify an original name
     local orig
     orig=$(get_original_name "$iface")
     [[ "$orig" != "unknown" && "$orig" != "$iface" ]]
