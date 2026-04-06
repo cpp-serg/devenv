@@ -11,5 +11,5 @@ ${SUDO} dnf install -y util-linux-user findutils git git-lfs tar bzip2 unzip pyt
 ${INSTALL_DIR}/install-tmux.sh
 ${INSTALL_DIR}/install-neovim.sh
 ${INSTALL_DIR}/install-sctp.sh
-${MY_DIR}/dotfiles/fzf/install --bin
+${MY_DIR}/../../dotfiles/fzf/install --bin
 
