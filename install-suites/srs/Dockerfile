@@ -11,6 +11,7 @@ RUN dnf install -y epel-release dnf-plugins-core && \
         fftw-devel \
         mbedtls-devel \
         boost-devel \
+        boost-static \
         lksctp-tools-devel \
         libconfig-devel \
         zeromq-devel \

@@ -29,9 +29,6 @@ Requires:       fftw-libs
 Requires:       mbedtls
 Requires:       lksctp-tools
 Requires:       libconfig
-Requires:       zeromq
-Requires:       boost-program-options
-Requires:       boost-thread
 
 %description enb
 srsENB is an open-source LTE eNodeB (base station) simulator
@@ -42,10 +39,6 @@ Summary:        srsRAN 4G UE LTE simulator
 Requires:       fftw-libs
 Requires:       mbedtls
 Requires:       lksctp-tools
-Requires:       libconfig
-Requires:       zeromq
-Requires:       boost-program-options
-Requires:       boost-thread
 
 %description ue
 srsUE is an open-source LTE User Equipment simulator
@@ -72,12 +65,6 @@ install -m 0644 %{_builddir}/configs/rb.conf.example %{buildroot}%{_sysconfdir}/
 # UE configs
 install -m 0644 %{_builddir}/configs/ue.conf.example %{buildroot}%{_sysconfdir}/srsran/ue.conf.example
 
-# Libraries
-install -d %{buildroot}%{_libdir}/srsran
-for lib in %{_builddir}/libs/*.so*; do
-    [ -f "$lib" ] && install -m 0755 "$lib" %{buildroot}%{_libdir}/srsran/ || true
-done
-
 %files enb
 %{_bindir}/srsenb
 %dir %{_sysconfdir}/srsran
@@ -85,28 +72,8 @@ done
 %config(noreplace) %{_sysconfdir}/srsran/rr.conf.example
 %config(noreplace) %{_sysconfdir}/srsran/sib.conf.example
 %config(noreplace) %{_sysconfdir}/srsran/rb.conf.example
-%dir %{_libdir}/srsran
-%{_libdir}/srsran/*.so*
 
 %files ue
 %{_bindir}/srsue
 %dir %{_sysconfdir}/srsran
 %config(noreplace) %{_sysconfdir}/srsran/ue.conf.example
-%dir %{_libdir}/srsran
-%{_libdir}/srsran/*.so*
-
-%post enb
-echo %{_libdir}/srsran > /etc/ld.so.conf.d/srsran.conf
-ldconfig
-
-%post ue
-echo %{_libdir}/srsran > /etc/ld.so.conf.d/srsran.conf
-ldconfig
-
-%postun enb
-rm -f /etc/ld.so.conf.d/srsran.conf
-ldconfig
-
-%postun ue
-rm -f /etc/ld.so.conf.d/srsran.conf
-ldconfig
