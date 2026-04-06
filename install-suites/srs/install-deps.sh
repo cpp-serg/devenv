@@ -1,25 +1,32 @@
 #!/bin/bash
-# Install runtime dependencies for srsRAN 4G on Rocky Linux 8 / RHEL 8 / CentOS 8
+# Install runtime dependencies for srsRAN 4G on Rocky Linux 8/9, RHEL 8/9, CentOS 8
 set -euo pipefail
 
 SUDO=$([ "$(id -u)" -ne 0 ] && echo "sudo" || echo "")
 
-echo "=== Installing srsRAN 4G runtime dependencies ==="
+# Detect OS major version
+OS_VER=$(rpm -E %{rhel})
+echo "=== Installing srsRAN 4G runtime dependencies (EL${OS_VER}) ==="
 
 # EPEL is required for mbedtls, zeromq, libsodium, openpgm
 $SUDO dnf install -y epel-release
-$SUDO dnf config-manager --set-enabled powertools
 
-$SUDO dnf install -y \
-    fftw-libs-single \
-    mbedtls \
-    lksctp-tools \
-    libconfig \
-    zeromq \
-    boost-program-options \
-    libsodium \
-    openpgm \
+# powertools (EL8) was renamed to crb (EL9)
+if [ "$OS_VER" -ge 9 ]; then
+    $SUDO dnf config-manager --set-enabled crb
+else
+    $SUDO dnf config-manager --set-enabled powertools
+fi
+
+PACKAGES=(
+    fftw-libs-single
+    mbedtls
+    lksctp-tools
+    libconfig
     libunwind
+)
+
+$SUDO dnf install -y "${PACKAGES[@]}"
 
 echo ""
 echo "=== All dependencies installed ==="

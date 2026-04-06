@@ -34,18 +34,20 @@ podman run --rm \
     bash -c '
 set -euo pipefail
 
-# Build srsRAN 4G
+# Clean and create build directory
+rm -rf /build/srsran/build
 mkdir -p /build/srsran/build
 cd /build/srsran/build
 cmake3 .. \
     -DCMAKE_INSTALL_PREFIX=/usr \
     -DCMAKE_BUILD_TYPE=Release \
     -DENABLE_ZEROMQ=ON \
-    -DBUILD_STATIC=OFF
+    -DBoost_USE_STATIC_LIBS=ON \
+    -DENABLE_RF_PLUGINS=OFF
 make -j$(nproc)
 
 # Stage artifacts
-mkdir -p /staging/configs /staging/libs
+mkdir -p /staging/configs
 cp /build/srsran/build/srsenb/src/srsenb /staging/
 cp /build/srsran/build/srsue/src/srsue /staging/
 cp /build/srsran/build/srsepc/src/srsepc /staging/
@@ -58,8 +60,6 @@ cp /build/srsran/srsenb/rb.conf.example /staging/configs/
 cp /build/srsran/srsue/ue.conf.example /staging/configs/
 cp /build/srsran/srsepc/epc.conf.example /staging/configs/
 cp /build/srsran/srsepc/mbms.conf.example /staging/configs/
-# Collect built shared libs
-find /build/srsran/build/lib -name "*.so*" -exec cp -P {} /staging/libs/ \;
 
 # Build RPMs
 mkdir -p /root/rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
@@ -67,20 +67,17 @@ cp /staging/srsran4g.spec /root/rpmbuild/SPECS/
 cp /staging/srsenb /root/rpmbuild/BUILD/
 cp /staging/srsue /root/rpmbuild/BUILD/
 cp -r /staging/configs /root/rpmbuild/BUILD/
-cp -r /staging/libs /root/rpmbuild/BUILD/
 rpmbuild -bb /root/rpmbuild/SPECS/srsran4g.spec \
     --define "_topdir /root/rpmbuild"
 
 # Collect all artifacts into /output
-mkdir -p /output/bin/lib /output/bin/config
+mkdir -p /output/bin/config
 cp /root/rpmbuild/RPMS/*/*.rpm /output/
 # Binaries
 cp /staging/srsenb /output/bin/
 cp /staging/srsue /output/bin/
 cp /staging/srsepc /output/bin/
 cp /staging/srsmbms /output/bin/
-# Shared libs
-cp -P /staging/libs/*.so* /output/bin/lib/
 # Config files
 for f in /staging/configs/*.conf.example; do
     base=$(basename "$f" .example)
