@@ -1,0 +1,119 @@
+FROM rockylinux:8.10
+
+# Layer 1 — Base OS + system packages
+RUN dnf -y install dnf-plugins-core \
+    && dnf config-manager --set-enabled powertools \
+    && dnf -y install \
+        gcc make git autoconf automake libtool \
+        openssl-devel pkgconfig wget curl \
+        bash findutils \
+    && dnf clean all
+
+# Layer 2 — Erlang/OTP from Erlang Solutions (CentOS 8 packages work on Rocky 8)
+RUN curl -Lo /tmp/esl-erlang.rpm \
+        https://binaries2.erlang-solutions.com/centos/8/esl-erlang_26.2.1_1~centos~8_x86_64.rpm \
+    && dnf -y install /tmp/esl-erlang.rpm \
+    && rm -f /tmp/esl-erlang.rpm \
+    && dnf clean all
+# Verify critical OTP applications
+RUN erl -noinput -eval \
+    '[ok = application:ensure_started(A) || A <- [kernel,stdlib,sasl,mnesia,crypto,asn1,public_key,ssl,inets,xmerl,compiler,parsetools,syntax_tools,os_mon,snmp,diameter]], io:format("OTP apps OK~n"), init:stop().'
+
+# Layer 3 — Node.js 18 + Yarn
+RUN dnf -y module enable nodejs:18 \
+    && dnf -y install nodejs \
+    && npm install -g yarn \
+    && dnf clean all
+
+# Layer 4 — Build environment
+ENV BUILD_ROOT=/opt/build
+ENV INSTALL_PREFIX=${BUILD_ROOT}/install
+ENV ERL_LIBS=${INSTALL_PREFIX}/lib
+ENV ERLANG_INSTALL_LIB_DIR=${INSTALL_PREFIX}/lib
+WORKDIR ${BUILD_ROOT}
+
+# Layer 5a — Install rebar3
+RUN wget -q https://github.com/erlang/rebar3/releases/download/3.24.0/rebar3 -O /usr/local/bin/rebar3 \
+    && chmod +x /usr/local/bin/rebar3
+
+# Layer 5b — Build mochiweb
+RUN git clone https://github.com/mochi/mochiweb.git \
+    && cd mochiweb \
+    && make all \
+    && MOCHI_BUILD=_build/default/lib/mochiweb \
+    && MOCHI_VSN=$(erl -noinput -eval \
+        '{ok, [{application, mochiweb, Props}]} = file:consult("'${MOCHI_BUILD}'/ebin/mochiweb.app"), {vsn, Vsn} = lists:keyfind(vsn, 1, Props), io:format("~s", [Vsn]), init:stop().') \
+    && mkdir -p ${ERL_LIBS}/mochiweb-${MOCHI_VSN} \
+    && cp -r ${MOCHI_BUILD}/ebin ${ERL_LIBS}/mochiweb-${MOCHI_VSN}/ \
+    && cp -r ${MOCHI_BUILD}/include ${ERL_LIBS}/mochiweb-${MOCHI_VSN}/ 2>/dev/null || true \
+    && cp -r ${MOCHI_BUILD}/src ${ERL_LIBS}/mochiweb-${MOCHI_VSN}/ 2>/dev/null || true \
+    && echo "mochiweb-${MOCHI_VSN} installed"
+
+# Layer 6 — Build radierl
+RUN git clone https://gitlab.com/sigscale/radierl.git \
+    && cd radierl \
+    && aclocal && autoheader && autoconf && libtoolize --automake && automake --add-missing \
+    && mkdir build && cd build \
+    && ERLANG_INSTALL_LIB_DIR=${ERL_LIBS} ../configure \
+    && make && make install
+
+# Layer 7 — Build sigscale_mibs
+RUN git clone https://gitlab.com/sigscale/sigscale_mibs.git \
+    && cd sigscale_mibs \
+    && aclocal && autoheader && autoconf && libtoolize --automake && automake --add-missing \
+    && mkdir build && cd build \
+    && ERLANG_INSTALL_LIB_DIR=${ERL_LIBS} ../configure \
+    && make && make install
+
+# Layer 8 — Copy OCS source (cache-busting layer)
+COPY ocs/ ${BUILD_ROOT}/src/ocs/
+
+# Layer 9 — Autotools bootstrap on OCS
+RUN cd ${BUILD_ROOT}/src/ocs \
+    && aclocal && autoheader && autoconf && libtoolize --automake && automake --add-missing
+
+# Layer 10 — Configure OCS (out-of-tree)
+RUN mkdir -p ${BUILD_ROOT}/ocs.build \
+    && cd ${BUILD_ROOT}/ocs.build \
+    && ERLANG_INSTALL_LIB_DIR=${ERL_LIBS} ERL_LIBS=${ERL_LIBS} \
+       ${BUILD_ROOT}/src/ocs/configure --with-systemdsystemunitdir=no
+
+# Layer 11 — Build OCS
+RUN cd ${BUILD_ROOT}/ocs.build \
+    && export PATH="$(yarn global bin):${PATH}" \
+    && export NODE_OPTIONS="--max-old-space-size=4096" \
+    && make \
+    && yarn cache clean \
+    && rm -rf /tmp/* /root/.npm
+
+# Layer 12 — Install OCS
+RUN cd ${BUILD_ROOT}/ocs.build \
+    && make install
+
+# Layer 13 — Create release tarball
+RUN cd ${BUILD_ROOT}/ocs.build \
+    && make release
+
+# Layer 14 — Stage artifacts
+RUN mkdir -p /artifacts/scripts \
+    && OCS_VSN=$(cd ${BUILD_ROOT}/ocs.build && grep '^PACKAGE_VERSION' Makefile | head -1 | sed 's/.*= *//') \
+    && cp ${BUILD_ROOT}/ocs.build/ocs-${OCS_VSN}.tar.gz /artifacts/ \
+    && cp ${BUILD_ROOT}/ocs.build/sys.config /artifacts/ \
+    && cp ${BUILD_ROOT}/ocs.build/ocs-${OCS_VSN}.rel /artifacts/ocs.rel \
+    && cp -r ${ERL_LIBS} /artifacts/install_lib \
+    # Render systemd service file
+    && ERLANG_ROOT_DIR=$(erl -noinput -eval 'io:format("~s", [code:root_dir()]), init:stop().') \
+    && sed -e "s|@ERLANG_ROOT_DIR@|${ERLANG_ROOT_DIR}|g" \
+       ${BUILD_ROOT}/src/ocs/scripts/ocs.service.in > /artifacts/scripts/ocs.service \
+    # Render environment file
+    && RELDIR=${ERLANG_ROOT_DIR}/releases \
+    && sed -e "s|@ERLANG_ROOT_DIR@|${ERLANG_ROOT_DIR}|g" \
+           -e "s|@RELDIR@|/home/otp/releases|g" \
+       ${BUILD_ROOT}/src/ocs/scripts/ocs.in > /artifacts/scripts/ocs.env \
+    # Copy helper scripts
+    && cp ${BUILD_ROOT}/src/ocs/scripts/install_tables.escript /artifacts/scripts/ \
+    && cp ${BUILD_ROOT}/src/ocs/scripts/install_snmp.sh /artifacts/scripts/ \
+    && cp ${BUILD_ROOT}/src/ocs/scripts/install_certs.sh /artifacts/scripts/ \
+    && cp ${BUILD_ROOT}/src/ocs/scripts/install_release.sh /artifacts/scripts/
+
+CMD ["/bin/bash"]
