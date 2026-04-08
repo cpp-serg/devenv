@@ -1,5 +1,5 @@
 #!/bin/bash
-# Install SigScale OCS from build artifacts onto Rocky Linux 8.10
+# Install SigScale OCS from build artifacts onto Rocky Linux 8 or 9
 # Usage: install-ocs.sh [OPTIONS] [OUTPUT_DIR]
 # Run as root on the target system
 set -euo pipefail
