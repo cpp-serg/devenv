@@ -1,5 +1,5 @@
 #!/bin/bash
-# Install prerequisites for SigScale OCS on Rocky Linux 8.10
+# Install prerequisites for SigScale OCS on Rocky Linux 8 or 9
 # Run as root on the target system
 set -euo pipefail
 
@@ -8,17 +8,36 @@ if [ "$(id -u)" -ne 0 ]; then
     exit 1
 fi
 
-echo "=== Installing OCS prerequisites on Rocky Linux 8.10 ==="
+# Detect OS major version
+OS_VERSION=$(rpm -E %{rhel})
+if [ "$OS_VERSION" -ne 8 ] && [ "$OS_VERSION" -ne 9 ]; then
+    echo "ERROR: Unsupported OS version (EL${OS_VERSION}). Requires Rocky Linux 8 or 9."
+    exit 1
+fi
 
-# Enable PowerTools repo
-echo "--- Enabling PowerTools repo ---"
+echo "=== Installing OCS prerequisites on Rocky Linux ${OS_VERSION} ==="
+
+# Enable extra packages repo
+echo "--- Enabling extra packages repo ---"
 dnf -y install dnf-plugins-core
-dnf config-manager --set-enabled powertools
+if [ "$OS_VERSION" -eq 8 ]; then
+    # Rocky Linux 8: repo is named 'powertools'
+    dnf config-manager --set-enabled powertools
+else
+    # Rocky Linux 9: repo is named 'crb' (CodeReady Builder)
+    dnf config-manager --set-enabled crb
+fi
 
 # Install Erlang/OTP from Erlang Solutions
 echo "--- Installing Erlang/OTP ---"
-curl -o /tmp/esl-erlang.rpm \
-    https://binaries2.erlang-solutions.com/centos/8/esl-erlang_26.2.1_1~centos~8_x86_64.rpm
+if [ "$OS_VERSION" -eq 8 ]; then
+    # Rocky Linux 8: packages under centos/8/
+    ESL_ERLANG_URL="https://binaries2.erlang-solutions.com/centos/8/esl-erlang_26.2.1_1~centos~8_x86_64.rpm"
+else
+    # Rocky Linux 9: packages under rockylinux/esl-erlang-26/
+    ESL_ERLANG_URL="https://binaries2.erlang-solutions.com/rockylinux/esl-erlang-26/esl-erlang_26.2.1_1~centos~8_x86_64.rpm"
+fi
+curl -o /tmp/esl-erlang.rpm "$ESL_ERLANG_URL"
 dnf -y install /tmp/esl-erlang.rpm
 rm -f /tmp/esl-erlang.rpm
 
@@ -64,4 +83,5 @@ fi
 
 echo ""
 echo "=== Prerequisites installed successfully ==="
+echo "OS: Rocky Linux ${OS_VERSION}"
 echo "Erlang: $(erl -noinput -eval 'io:format("~s", [erlang:system_info(otp_release)]), init:stop().')"

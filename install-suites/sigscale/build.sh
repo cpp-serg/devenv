@@ -13,9 +13,12 @@ while getopts "c" opt; do
     esac
 done
 
-# Verify OCS source exists
-if [ ! -f ocs/configure.ac ]; then
-    echo "ERROR: ocs/configure.ac not found. Clone OCS source into ./ocs/ first."
+# Clone OCS source if it doesn't exist
+if [ ! -d ocs ]; then
+    echo "Cloning OCS source..."
+    git clone https://github.com/sigscale/ocs.git ocs
+elif [ ! -f ocs/configure.ac ]; then
+    echo "ERROR: ocs/ exists but configure.ac not found."
     exit 1
 fi
 
