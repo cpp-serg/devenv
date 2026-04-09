@@ -207,6 +207,15 @@ return {
                         },
                     },
                 },
+                yamlls = {
+                    settings = {
+                        yaml = {
+                            schemaStore = {
+                                enable = true,
+                            },
+                        },
+                    },
+                },
             }
 
             if vim.fn.executable('go') == 1 then
