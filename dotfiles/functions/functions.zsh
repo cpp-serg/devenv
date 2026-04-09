@@ -14,3 +14,16 @@ function sp-ssh-shared-push {
     devenv_run_git commit -m "Update ssh_shared.zip"
     devenv_run_git push
 }
+
+alias pgw_pools='curl -s http://127.0.0.15:39096/v1/ipman/pools\?list_allocated | jqp'
+alias pgw_allocations='curl -s http://127.0.0.15:39096/v1/ipman/allocations | jqp'
+
+pgw_imsi_lookup() { curl -s "http://127.0.0.15:39096/v1/ipman/imsi/$1" | jqp }
+
+pgw_ip_lookup() { curl -s "http://127.0.0.15:39096/v1/ipman/ip/$1" | jqp }
+
+if (( $+commands[npx] )); then
+  jqp() { npx prettier --parser json --print-width 160 | bat -l json -p }
+else
+  jqp() { jq }
+fi
