@@ -1,4 +1,20 @@
 #!/bin/zsh
+function podbld {
+    [[ -d _deploy ]] || mkdir _deploy
+    [[ -d _ccache ]] || mkdir _ccache
+    [[ -d _build ]] || mkdir _build
+    [[ -d __INSTALL ]] || mkdir __INSTALL
+    [[ -d _third_party ]] || mkdir _third_party
+
+    podman run -it --rm --name build_oxio \
+        -v $(pwd):/ggsn \
+        -v $(pwd)/_build:/ggsn/build \
+        -v $(pwd)/_third_party:/ggsn/third_party \
+        -v $(pwd)/__INSTALL:/ggsn/_INSTALL \
+        -v $(pwd)/_deploy:/home/pente/ggsn \
+        -v $(pwd)/_ccache:/root/.ccache \
+        oxio:zsh $@
+}
 
 function sp-ssh-shared-push {
     zip -er ~/devenv/dotfiles/ssh_shared.zip ~/.ssh/shared || return
