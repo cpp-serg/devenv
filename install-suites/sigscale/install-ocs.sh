@@ -11,6 +11,10 @@ OCS_PORT_AUTH="${OCS_PORT_AUTH:-3869}"
 OCS_PORT_RADIUS_AUTH="${OCS_PORT_RADIUS_AUTH:-1812}"
 OCS_PORT_RADIUS_ACCT="${OCS_PORT_RADIUS_ACCT:-1813}"
 
+# DIAMETER identity (CER Origin-Host / Origin-Realm)
+OCS_ORIGIN_HOST="${OCS_ORIGIN_HOST:-sigscale}"
+OCS_ORIGIN_REALM="${OCS_ORIGIN_REALM:-ocs.localdomain}"
+
 usage() {
     cat <<EOF
 Usage: $(basename "$0") [OPTIONS] [OUTPUT_DIR]
@@ -21,10 +25,13 @@ Options:
   --port-auth PORT          DIAMETER Auth port (default: 3869)
   --port-radius-auth PORT   RADIUS Auth port (default: 1812)
   --port-radius-acct PORT   RADIUS Accounting port (default: 1813)
+  --origin-host HOST        DIAMETER Origin-Host (default: sigscale)
+  --origin-realm REALM      DIAMETER Origin-Realm (default: ocs.localdomain)
   -h, --help                Show this help
 
 Environment variables OCS_PORT_WEB, OCS_PORT_ACCT, OCS_PORT_AUTH,
-OCS_PORT_RADIUS_AUTH, OCS_PORT_RADIUS_ACCT can also be used.
+OCS_PORT_RADIUS_AUTH, OCS_PORT_RADIUS_ACCT, OCS_ORIGIN_HOST,
+OCS_ORIGIN_REALM can also be used.
 EOF
     exit 0
 }
@@ -36,6 +43,8 @@ while [[ $# -gt 0 ]]; do
         --port-auth)         OCS_PORT_AUTH="$2"; shift 2 ;;
         --port-radius-auth)  OCS_PORT_RADIUS_AUTH="$2"; shift 2 ;;
         --port-radius-acct)  OCS_PORT_RADIUS_ACCT="$2"; shift 2 ;;
+        --origin-host)       OCS_ORIGIN_HOST="$2"; shift 2 ;;
+        --origin-realm)      OCS_ORIGIN_REALM="$2"; shift 2 ;;
         -h|--help)           usage ;;
         -*)                  echo "Unknown option: $1"; usage ;;
         *)                   break ;;
@@ -171,9 +180,10 @@ su - otp -c "bash ${SCRIPT_DIR}/install_release.sh ${OCS_VSN}"
 
 # Step 10b: Patch sys.config (after release install which may overwrite it)
 echo "--- Patching ports and DIAMETER config ---"
+DIAM_IDENT="{'\''Origin-Host'\'', \"${OCS_ORIGIN_HOST}\"}, {'\''Origin-Realm'\'', \"${OCS_ORIGIN_REALM}\"}"
 awk -v acct="${OCS_PORT_ACCT}" -v auth="${OCS_PORT_AUTH}" \
     -v racct="${OCS_PORT_RADIUS_ACCT}" -v rauth="${OCS_PORT_RADIUS_AUTH}" \
-    -v web="${OCS_PORT_WEB}" '
+    -v web="${OCS_PORT_WEB}" -v ident="${DIAM_IDENT}" '
     /{radius,/  { in_radius=1 }
     /{diameter,/ { in_radius=0; in_diameter=1 }
     /acct_log_rotate/ { in_diameter=0 }
@@ -186,9 +196,9 @@ awk -v acct="${OCS_PORT_ACCT}" -v auth="${OCS_PORT_AUTH}" \
     next_is == "radius_acct" && /{0,0,0,0}/ {
         gsub(/{0,0,0,0}, [0-9]+/, "{0,0,0,0}, " racct); next_is="" }
     next_is == "diameter_acct" && /{0,0,0,0}/ {
-        gsub(/{0,0,0,0}, [0-9]+, \[\]/, "{0,0,0,0}, " acct ", [{transport_module, diameter_sctp}]"); next_is="" }
+        gsub(/{0,0,0,0}, [0-9]+, \[\]/, "{0,0,0,0}, " acct ", [{transport_module, diameter_sctp}, " ident "]"); next_is="" }
     next_is == "diameter_auth" && /{0,0,0,0}/ {
-        gsub(/{0,0,0,0}, [0-9]+, \[\]/, "{0,0,0,0}, " auth ", [{transport_module, diameter_sctp}]"); next_is="" }
+        gsub(/{0,0,0,0}, [0-9]+, \[\]/, "{0,0,0,0}, " auth ", [{transport_module, diameter_sctp}, " ident "]"); next_is="" }
     /{port, [0-9]+}/ { gsub(/{port, [0-9]+}/, "{port, " web "}") }
     { print }
 ' "${RELEASE_DIR}/sys.config" > "${RELEASE_DIR}/sys.config.tmp" \
@@ -235,3 +245,4 @@ echo "DIAMETER Acct: $(hostname):${OCS_PORT_ACCT}"
 echo "DIAMETER Auth: $(hostname):${OCS_PORT_AUTH}"
 echo "RADIUS Auth:   $(hostname):${OCS_PORT_RADIUS_AUTH}"
 echo "RADIUS Acct:   $(hostname):${OCS_PORT_RADIUS_ACCT}"
+echo "DIAMETER ID:   ${OCS_ORIGIN_HOST}@${OCS_ORIGIN_REALM}"
