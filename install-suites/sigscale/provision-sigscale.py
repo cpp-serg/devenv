@@ -4,10 +4,12 @@
 Each subscriber is provisioned with both voice calling and data plans.
 
 Usage: provision-sigscale.py [OPTIONS]
-  -H HOST       OCS host (default: localhost:8080)
-  -u USER:PASS  OCS credentials (default: admin:admin)
-  -d DIR        Provision data directory (default: provision/)
-  -y            Skip interactive prompts, auto-select voice+data bundle offering
+  -H HOST              OCS host (default: localhost:8080)
+  -u USER:PASS         OCS credentials (default: admin:admin)
+  -d DIR               Provision data directory (default: provision/)
+  -y                   Skip interactive prompts, auto-select voice+data bundle offering
+  --data-allowance SIZE  Data allowance per subscriber (default: 500M, e.g. 500M, 1G, 10G)
+  --redirect-url URL   Set redirect URL on offering(s) for payment portal on quota exhaustion
 """
 
 import argparse
@@ -18,8 +20,33 @@ import sys
 from collections import defaultdict
 from urllib.request import Request, urlopen
 from urllib.error import URLError
+from urllib.parse import quote
 import json
 import base64
+
+# --- Helpers ---
+
+def parse_size(s):
+    """Parse human-readable size to octets: '10G', '500M', '1024'."""
+    s = s.strip().upper()
+    multipliers = {"K": 1_000, "M": 1_000_000, "G": 1_000_000_000, "T": 1_000_000_000_000}
+    if s[-1] in multipliers:
+        return int(float(s[:-1]) * multipliers[s[-1]])
+    if s.endswith("B"):
+        s = s[:-1]
+    return int(s)
+
+
+def format_size(octets):
+    """Format octets as human-readable."""
+    if octets >= 1_000_000_000:
+        return f"{octets / 1_000_000_000:.1f}G"
+    if octets >= 1_000_000:
+        return f"{octets / 1_000_000:.0f}M"
+    if octets >= 1_000:
+        return f"{octets / 1_000:.0f}K"
+    return f"{octets}B"
+
 
 # --- OCS API client ---
 
@@ -30,7 +57,8 @@ class OCSClient:
         token = base64.b64encode(f"{user}:{password}".encode()).decode()
         self.auth_header = f"Basic {token}"
 
-    def request(self, method, path, body=None, accept="application/json"):
+    def request(self, method, path, body=None, accept="application/json",
+                content_type="application/json"):
         url = f"{self.base_url}{path}"
         data = json.dumps(body).encode() if body else None
         req = Request(url, data=data, method=method)
@@ -38,14 +66,16 @@ class OCSClient:
             req.add_header("Accept", accept)
         req.add_header("Authorization", self.auth_header)
         if body is not None:
-            req.add_header("Content-Type", "application/json")
+            req.add_header("Content-Type", content_type)
         try:
             with urlopen(req) as resp:
-                return resp.status, json.loads(resp.read().decode())
+                raw = resp.read().decode()
+                return resp.status, json.loads(raw) if raw else {}
         except URLError as e:
             if hasattr(e, "read"):
                 try:
-                    return e.code, json.loads(e.read().decode())
+                    raw = e.read().decode()
+                    return e.code, json.loads(raw) if raw else {}
                 except Exception:
                     return e.code, {}
             raise
@@ -55,6 +85,13 @@ class OCSClient:
 
     def post(self, path, body):
         return self.request("POST", path, body)
+
+    def patch(self, path, body):
+        return self.request("PATCH", path, body,
+                            content_type="application/json-patch+json")
+
+    def delete(self, path):
+        return self.request("DELETE", path, accept=None)
 
 
 # --- Offering classification ---
@@ -96,6 +133,59 @@ def prompt_choice(prompt, count):
         except (ValueError, EOFError):
             pass
         print(f"  Please enter a number between 1 and {count}")
+
+
+# --- Offering redirect configuration ---
+
+def set_offering_redirect(ocs, offering_name, redirect_url):
+    """Set redirectServer on a product offering via JSON Patch (RFC 6902).
+
+    If the offering already has prodSpecCharValueUse, append to it;
+    otherwise add the array with the redirectServer entry.
+    """
+    path = f"/catalogManagement/v2/productOffering/{quote(offering_name, safe='')}"
+    status, offering = ocs.get(path)
+    if status != 200:
+        return False, f"GET offering failed (HTTP {status})"
+
+    char_uses = offering.get("prodSpecCharValueUse", [])
+    redirect_entry = {
+        "name": "redirectServer",
+        "valueType": "String",
+        "productSpecCharacteristicValue": [{"value": redirect_url}],
+    }
+
+    # Check if redirectServer is already set with this value
+    for cu in char_uses:
+        if cu.get("name") == "redirectServer":
+            vals = cu.get("productSpecCharacteristicValue", [])
+            if vals and vals[0].get("value") == redirect_url:
+                return True, "already set"
+
+    # Build JSON Patch operations
+    existing_idx = None
+    for i, cu in enumerate(char_uses):
+        if cu.get("name") == "redirectServer":
+            existing_idx = i
+            break
+
+    if existing_idx is not None:
+        ops = [{"op": "replace",
+                "path": f"/prodSpecCharValueUse/{existing_idx}",
+                "value": redirect_entry}]
+    elif char_uses:
+        ops = [{"op": "add",
+                "path": "/prodSpecCharValueUse/-",
+                "value": redirect_entry}]
+    else:
+        ops = [{"op": "add",
+                "path": "/prodSpecCharValueUse",
+                "value": [redirect_entry]}]
+
+    status, resp = ocs.patch(path, ops)
+    if status == 200:
+        return True, "configured"
+    return False, f"PATCH failed (HTTP {status})"
 
 
 # --- CSV loading ---
@@ -144,13 +234,78 @@ def create_product(ocs, offering_id, service_id):
     }
     status, resp = ocs.post("/productInventoryManagement/v2/product", body)
     if status == 201:
-        return True, "created"
+        return True, "created", resp.get("id")
     if "has Product already" in json.dumps(resp):
-        return True, "exists"
-    return False, f"HTTP {status}"
+        return True, "exists", None
+    return False, f"HTTP {status}", None
 
 
-def provision_bundle(ocs, sub, ki, opc, bundle_name):
+def cleanup_negative_buckets(ocs, product_id):
+    """Delete negative balance buckets that block credit authorization.
+
+    OCS charge1() rejects all credit grants (CREDIT_LIMIT_REACHED 4012)
+    when any bucket has a negative balance, regardless of unit type.
+    Installation and subscription charges create negative cents buckets
+    that block unrelated octets-based data grants.
+    """
+    if not product_id:
+        return 0
+    status, buckets = ocs.get("/balanceManagement/v1/bucket")
+    if status != 200:
+        return 0
+    deleted = 0
+    for b in buckets:
+        if b.get("product", {}).get("id") != product_id:
+            continue
+        amount_str = b.get("remainedAmount", {}).get("amount", "0")
+        amount_str = amount_str.rstrip("b")
+        try:
+            if int(amount_str) < 0:
+                ocs.delete(b["href"])
+                deleted += 1
+        except ValueError:
+            pass
+    return deleted
+
+
+def adjust_data_balance(ocs, product_id, octets):
+    """Replace auto-created octets buckets with a specific data allowance."""
+    if not product_id or octets is None:
+        return
+    status, buckets = ocs.get("/balanceManagement/v1/bucket")
+    if status != 200:
+        return
+    for b in buckets:
+        if b.get("product", {}).get("id") != product_id:
+            continue
+        if b.get("remainedAmount", {}).get("units") == "octets":
+            ocs.delete(b["href"])
+    ocs.post(f"/balanceManagement/v1/product/{product_id}/balanceTopup",
+             {"amount": {"amount": octets, "units": "octets"}})
+
+
+def find_products_for_service(service_id, products_cache):
+    """Return product IDs whose realizingService includes service_id."""
+    result = []
+    for p in products_cache:
+        for rs in p.get("realizingService", []):
+            if rs.get("id") == service_id:
+                result.append(p["id"])
+                break
+    return result
+
+
+def update_existing_products(ocs, service_id, octets, products_cache):
+    """Clean negatives and enforce data allowance on all linked products."""
+    product_ids = find_products_for_service(service_id, products_cache)
+    for pid in product_ids:
+        cleanup_negative_buckets(ocs, pid)
+        adjust_data_balance(ocs, pid, octets)
+    return len(product_ids)
+
+
+def provision_bundle(ocs, sub, ki, opc, bundle_name, data_allowance=None,
+                     products_cache=None):
     """Provision with a single bundle offering (voice + data)."""
     imsi = sub["imsi"]
 
@@ -158,19 +313,33 @@ def provision_bundle(ocs, sub, ki, opc, bundle_name):
         {"name": "serviceIdentity", "value": imsi},
         {"name": "serviceAkaK", "value": ki},
         {"name": "serviceAkaOPc", "value": opc},
+        {"name": "multiSession", "value": True},
     ])
     if not ok:
         return "fail", f"service creation failed ({reason})"
 
-    ok, reason = create_product(ocs, bundle_name, imsi)
+    ok, reason, product_id = create_product(ocs, bundle_name, imsi)
     if not ok:
         return "fail", f"product creation failed ({reason})"
+
     if reason == "exists":
-        return "skip", "already provisioned"
+        n = update_existing_products(ocs, imsi, data_allowance,
+                                     products_cache or [])
+        return "update", f"updated {n} existing product(s)"
+
+    cleanup_negative_buckets(ocs, product_id)
+    adjust_data_balance(ocs, product_id, data_allowance)
+    # Also update any pre-existing sibling products linked to the same service
+    if products_cache:
+        for pid in find_products_for_service(imsi, products_cache):
+            if pid != product_id:
+                cleanup_negative_buckets(ocs, pid)
+                adjust_data_balance(ocs, pid, data_allowance)
     return "ok", "bundle: voice + data"
 
 
-def provision_separate(ocs, sub, ki, opc, voice_offering, data_offering):
+def provision_separate(ocs, sub, ki, opc, voice_offering, data_offering,
+                       data_allowance=None, products_cache=None):
     """Provision with separate voice and data offerings."""
     imsi = sub["imsi"]
     msisdn = sub["msisdn"]
@@ -180,6 +349,7 @@ def provision_separate(ocs, sub, ki, opc, voice_offering, data_offering):
         {"name": "serviceIdentity", "value": imsi},
         {"name": "serviceAkaK", "value": ki},
         {"name": "serviceAkaOPc", "value": opc},
+        {"name": "multiSession", "value": True},
     ])
     if not ok:
         return "fail", f"IMSI service failed ({reason})"
@@ -194,9 +364,9 @@ def provision_separate(ocs, sub, ki, opc, voice_offering, data_offering):
         return "fail", f"MSISDN service failed ({reason})"
 
     # Voice product -> MSISDN service
-    v_ok, v_reason = create_product(ocs, voice_offering, msisdn)
+    v_ok, v_reason, v_product_id = create_product(ocs, voice_offering, msisdn)
     # Data product -> IMSI service
-    d_ok, d_reason = create_product(ocs, data_offering, imsi)
+    d_ok, d_reason, d_product_id = create_product(ocs, data_offering, imsi)
 
     if not v_ok or not d_ok:
         parts = []
@@ -205,8 +375,24 @@ def provision_separate(ocs, sub, ki, opc, voice_offering, data_offering):
         if not d_ok:
             parts.append(f"data({d_reason})")
         return "fail", " ".join(parts)
+
     if v_reason == "exists" and d_reason == "exists":
-        return "skip", "already provisioned"
+        cache = products_cache or []
+        n = update_existing_products(ocs, imsi, data_allowance, cache)
+        # voice products (MSISDN) only need negative-bucket cleanup, not data adjust
+        for pid in find_products_for_service(msisdn, cache):
+            cleanup_negative_buckets(ocs, pid)
+        return "update", f"updated {n} existing product(s)"
+
+    cleanup_negative_buckets(ocs, v_product_id)
+    cleanup_negative_buckets(ocs, d_product_id)
+    adjust_data_balance(ocs, d_product_id, data_allowance)
+    # Also update any pre-existing sibling data products for this IMSI
+    if products_cache:
+        for pid in find_products_for_service(imsi, products_cache):
+            if pid != d_product_id:
+                cleanup_negative_buckets(ocs, pid)
+                adjust_data_balance(ocs, pid, data_allowance)
     return "ok", f"voice={msisdn} + data={imsi}"
 
 
@@ -297,6 +483,11 @@ def main():
                         help="Provision data directory (default: provision/)")
     parser.add_argument("-y", "--auto", action="store_true",
                         help="Skip interactive prompts, auto-select bundle offering")
+    parser.add_argument("--data-allowance", default="500M",
+                        help="Data allowance per subscriber, e.g. 500M, 1G (default: 500M)")
+    parser.add_argument("--redirect-url",
+                        default=os.environ.get("OCS_REDIRECT_URL"),
+                        help="Redirect URL for payment portal on quota exhaustion")
     args = parser.parse_args()
 
     ocs = OCSClient(args.host, args.credentials)
@@ -378,6 +569,24 @@ def main():
             print(f"Selected voice: {selected_voice}")
             print(f"Selected data:  {selected_data}")
 
+    # --- Configure redirect on selected offering(s) ---
+    if args.redirect_url:
+        print(f"\n=== Configuring Redirect Server ===")
+        print(f"  URL: {args.redirect_url}")
+        offerings_to_update = []
+        if use_bundle:
+            offerings_to_update.append(selected_bundle)
+        else:
+            offerings_to_update.append(selected_voice)
+            offerings_to_update.append(selected_data)
+        for offer_name in offerings_to_update:
+            ok, detail = set_offering_redirect(ocs, offer_name, args.redirect_url)
+            status_str = "OK" if ok else "FAIL"
+            print(f"  {status_str}  {offer_name}: {detail}")
+            if not ok:
+                print("ERROR: Failed to configure redirect on offering")
+                sys.exit(1)
+
     # --- Fetch tariff tables ---
     print("\n=== Tariff Tables ===")
     _, resources = ocs.get("/resourceInventoryManagement/v1/resource")
@@ -405,6 +614,8 @@ def main():
             print("No tariff table selected.")
 
     # --- Provision ---
+    data_allowance = parse_size(args.data_allowance)
+
     print(f"\n=== Provisioning {len(subscribers)} subscribers (voice + data) ===")
     if use_bundle:
         print(f"  Mode:    bundle")
@@ -413,9 +624,17 @@ def main():
         print(f"  Mode:    separate voice + data")
         print(f"  Voice:   {selected_voice}")
         print(f"  Data:    {selected_data}")
+    print(f"  Data:    {format_size(data_allowance)} per subscriber")
     if selected_tariff:
         print(f"  Tariff:  {selected_tariff}")
+    if args.redirect_url:
+        print(f"  Redirect: {args.redirect_url}")
     print()
+
+    # Pre-fetch products once so per-subscriber updates don't re-query
+    _, products_cache = ocs.get("/productInventoryManagement/v2/product")
+    if not isinstance(products_cache, list):
+        products_cache = []
 
     counts = defaultdict(int)
 
@@ -429,14 +648,19 @@ def main():
         ki, opc = keys[imsi]
 
         if use_bundle:
-            result, detail = provision_bundle(ocs, sub, ki, opc, selected_bundle)
+            result, detail = provision_bundle(ocs, sub, ki, opc,
+                                              selected_bundle, data_allowance,
+                                              products_cache)
         else:
             result, detail = provision_separate(ocs, sub, ki, opc,
-                                                selected_voice, selected_data)
+                                                selected_voice, selected_data,
+                                                data_allowance, products_cache)
 
         counts[result] += 1
         if result == "ok":
             print(f"  OK   {imsi} ({detail})", end="\r")
+        elif result == "update":
+            print(f"  UPD  {imsi} ({detail})", end="\r")
         elif result == "skip":
             print(f"  SKIP {imsi} ({detail})", end="\r")
         else:
@@ -445,6 +669,7 @@ def main():
     print()
     print(f"\n=== Provisioning Complete ===")
     print(f"  Created:  {counts['ok']}")
+    print(f"  Updated:  {counts['update']}")
     print(f"  Skipped:  {counts['skip']}")
     print(f"  Failed:   {counts['fail']}")
 
