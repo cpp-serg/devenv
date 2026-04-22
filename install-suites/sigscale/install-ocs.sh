@@ -180,7 +180,7 @@ su - otp -c "bash ${SCRIPT_DIR}/install_release.sh ${OCS_VSN}"
 
 # Step 10b: Patch sys.config (after release install which may overwrite it)
 echo "--- Patching ports and DIAMETER config ---"
-DIAM_IDENT="{'\''Origin-Host'\'', \"${OCS_ORIGIN_HOST}\"}, {'\''Origin-Realm'\'', \"${OCS_ORIGIN_REALM}\"}"
+DIAM_IDENT="{'Origin-Host', \"${OCS_ORIGIN_HOST}\"}, {'Origin-Realm', \"${OCS_ORIGIN_REALM}\"}"
 awk -v acct="${OCS_PORT_ACCT}" -v auth="${OCS_PORT_AUTH}" \
     -v racct="${OCS_PORT_RADIUS_ACCT}" -v rauth="${OCS_PORT_RADIUS_AUTH}" \
     -v web="${OCS_PORT_WEB}" -v ident="${DIAM_IDENT}" '
