@@ -1,18 +1,18 @@
 #!/bin/zsh
 function podbld {
-    [[ -d _deploy ]] || mkdir _deploy
-    [[ -d _ccache ]] || mkdir _ccache
-    [[ -d _build ]] || mkdir _build
-    [[ -d __INSTALL ]] || mkdir __INSTALL
-    [[ -d _third_party ]] || mkdir _third_party
+    [[ -d cont_deploy ]] || mkdir cont_deploy
+    [[ -d cont_ccache ]] || mkdir cont_ccache
+    [[ -d cont_build ]] || mkdir cont_build
+    [[ -d cont_INSTALL ]] || mkdir cont_INSTALL
+    [[ -d cont_third_party ]] || mkdir cont_third_party
 
     podman run -it --rm --name build_oxio \
         -v $(pwd):/ggsn \
-        -v $(pwd)/_build:/ggsn/build \
-        -v $(pwd)/_third_party:/ggsn/third_party \
-        -v $(pwd)/__INSTALL:/ggsn/_INSTALL \
-        -v $(pwd)/_deploy:/home/pente/ggsn \
-        -v $(pwd)/_ccache:/root/.ccache \
+        -v $(pwd)/cont_build:/ggsn/build \
+        -v $(pwd)/cont_third_party:/ggsn/third_party \
+        -v $(pwd)/cont_INSTALL:/ggsn/_INSTALL \
+        -v $(pwd)/cont_deploy:/home/pente/ggsn \
+        -v $(pwd)/cont_ccache:/root/.ccache \
         oxio:zsh $@
 }
 
