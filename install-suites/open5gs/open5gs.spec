@@ -222,13 +222,16 @@ sed -i '/^Group=open5gs/a\\nAmbientCapabilities=CAP_NET_ADMIN\nCapabilityBoundin
 
 # --- Configuration files ---
 install -d %{buildroot}%{_sysconfdir}/open5gs
-install -d %{buildroot}%{_sysconfdir}/freeDiameter
+install -d %{buildroot}%{_sysconfdir}/open5gs/freeDiameter
 for f in %{_vpath_builddir}/configs/open5gs/*.yaml; do
     install -m 0644 "$f" %{buildroot}%{_sysconfdir}/open5gs/
 done
 for f in %{_vpath_builddir}/configs/freeDiameter/*.conf; do
-    install -m 0644 "$f" %{buildroot}%{_sysconfdir}/freeDiameter/
+    install -m 0644 "$f" %{buildroot}%{_sysconfdir}/open5gs/freeDiameter/
 done
+
+# Fix freeDiameter config paths in YAML files: /etc/freeDiameter/ → /etc/open5gs/freeDiameter/
+sed -i 's|/etc/freeDiameter/|/etc/open5gs/freeDiameter/|g' %{buildroot}%{_sysconfdir}/open5gs/*.yaml
 
 # --- Systemd service units ---
 install -d %{buildroot}%{_unitdir}
@@ -464,7 +467,7 @@ exit 0
 %license LICENSE
 %doc README.md
 %dir %{_sysconfdir}/open5gs
-%dir %{_sysconfdir}/freeDiameter
+%dir %{_sysconfdir}/open5gs/freeDiameter
 %config(noreplace) %{_sysconfdir}/logrotate.d/open5gs
 %{_tmpfilesdir}/open5gs.conf
 %attr(0750,%{open5gs_user},%{open5gs_group}) %{_localstatedir}/log/open5gs
@@ -481,25 +484,25 @@ exit 0
 %files mme
 %{_bindir}/open5gs-mmed
 %config(noreplace) %{_sysconfdir}/open5gs/mme.yaml
-%config(noreplace) %{_sysconfdir}/freeDiameter/mme.conf
+%config(noreplace) %{_sysconfdir}/open5gs/freeDiameter/mme.conf
 %{_unitdir}/open5gs-mmed.service
 
 %files hss
 %{_bindir}/open5gs-hssd
 %config(noreplace) %{_sysconfdir}/open5gs/hss.yaml
-%config(noreplace) %{_sysconfdir}/freeDiameter/hss.conf
+%config(noreplace) %{_sysconfdir}/open5gs/freeDiameter/hss.conf
 %{_unitdir}/open5gs-hssd.service
 
 %files pcrf
 %{_bindir}/open5gs-pcrfd
 %config(noreplace) %{_sysconfdir}/open5gs/pcrf.yaml
-%config(noreplace) %{_sysconfdir}/freeDiameter/pcrf.conf
+%config(noreplace) %{_sysconfdir}/open5gs/freeDiameter/pcrf.conf
 %{_unitdir}/open5gs-pcrfd.service
 
 %files smf
 %{_bindir}/open5gs-smfd
 %config(noreplace) %{_sysconfdir}/open5gs/smf.yaml
-%config(noreplace) %{_sysconfdir}/freeDiameter/smf.conf
+%config(noreplace) %{_sysconfdir}/open5gs/freeDiameter/smf.conf
 %{_unitdir}/open5gs-smfd.service
 
 # --- NFs without freeDiameter configs ---

@@ -80,6 +80,7 @@ HOST_IP=$(ip -4 route get 1.0.0.0 2>/dev/null | awk '/src/{print $7; exit}')
 # ============================================================
 PRESET_LTE=(mme hss pcrf sgwc sgwu smf upf)
 PRESET_5G=(nrf scp amf ausf udm udr nssf bsf pcf smf upf)
+PRESET_DIAMETER=(hss pcrf )
 PRESET_ALL=(mme hss pcrf sgwc sgwu smf upf nrf scp amf ausf udm udr nssf bsf pcf sepp)
 
 # All known components (display order for checklist)
@@ -117,8 +118,9 @@ show_preset_dialog() {
     detect_dialog
     local choice
     choice=$($DIALOG_CMD --title "Open5GS Component Selection" \
-        --radiolist "Select deployment type:" 15 50 3 \
+        --radiolist "Select deployment type:" 15 50 4 \
         "lte"  "LTE EPC (4G)"      ON \
+        "dia"  "Diameter infra (HSS, PCRF)"      ON \
         "5g"   "5G Core"            OFF \
         "all"  "All components"     OFF \
         3>&1 1>&2 2>&3) || return 1
@@ -204,6 +206,7 @@ show_main_dialog() {
 apply_preset() {
     case "$1" in
         lte) SELECTED_COMPONENTS=("${PRESET_LTE[@]}") ;;
+        dia) SELECTED_COMPONENTS=("${PRESET_DIAMETER[@]}") ;;
         5g)  SELECTED_COMPONENTS=("${PRESET_5G[@]}") ;;
         all) SELECTED_COMPONENTS=("${PRESET_ALL[@]}") ;;
         *)
@@ -469,7 +472,7 @@ logger:
     path: /var/log/open5gs/mme.log
 
 mme:
-  freeDiameter: /etc/freeDiameter/mme.conf
+  freeDiameter: /etc/open5gs/freeDiameter/mme.conf
   s1ap:
     server:
       - address: ${ip}
@@ -509,7 +512,7 @@ logger:
 db_uri: mongodb://localhost/open5gs
 
 hss:
-  freeDiameter: /etc/freeDiameter/hss.conf
+  freeDiameter: /etc/open5gs/freeDiameter/hss.conf
 EOF
             ;;
         pcrf)
@@ -521,7 +524,7 @@ logger:
 db_uri: mongodb://localhost/open5gs
 
 pcrf:
-  freeDiameter: /etc/freeDiameter/pcrf.conf
+  freeDiameter: /etc/open5gs/freeDiameter/pcrf.conf
 EOF
             ;;
         sgwc)
@@ -570,7 +573,7 @@ smf:"
             # Include freeDiameter only when LTE components present
             if is_selected pcrf; then
                 smf_yaml+="
-  freeDiameter: /etc/freeDiameter/smf.conf"
+  freeDiameter: /etc/open5gs/freeDiameter/smf.conf"
             fi
             smf_yaml+="
   pfcp:
@@ -832,9 +835,9 @@ EOF
 
 write_fd_config() {
     local comp="$1"
-    local fd_path="/etc/freeDiameter/${comp}.conf"
+    local fd_path="/etc/open5gs/freeDiameter/${comp}.conf"
     local ip="${COMP_IP[${comp}]:-127.0.0.1}"
-    local src="${BUILDROOT}/etc/freeDiameter/${comp}.conf"
+    local src="${BUILDROOT}/etc/open5gs/freeDiameter/${comp}.conf"
 
     if [[ ! -f "${src}" ]]; then
         echo "ERROR: build-generated config not found: ${src}" >&2
@@ -842,7 +845,7 @@ write_fd_config() {
         return 1
     fi
 
-    $SUDO mkdir -p /etc/freeDiameter
+    $SUDO mkdir -p /etc/open5gs/freeDiameter
 
     local tmp
     tmp=$(mktemp)
@@ -956,7 +959,7 @@ echo ""
 echo "  Configuration:"
 echo "    YAML:       /etc/open5gs/*.yaml"
 if [[ ${#COMP_FD[@]} -gt 0 ]]; then
-    echo "    Diameter:   /etc/freeDiameter/*.conf"
+    echo "    Diameter:   /etc/open5gs/freeDiameter/*.conf"
 fi
 echo ""
 echo "  DB tools:"
