@@ -41,7 +41,69 @@ def load_imsi_provision(path):
     return subs
 
 
-def build_subscriber(imsi, msisdn, ki, opc):
+def build_subscriber(imsi, msisdn, ki, opc, ims=False):
+    audio_rule = {
+        "qos": {
+            "index": 1,
+            "arp": {
+                "priority_level": 1,
+                "pre_emption_capability": 1,
+                "pre_emption_vulnerability": 1,
+            },
+        },
+        "flow": [
+            {"direction": 1, "description": "permit out ip from any to any"},
+            {"direction": 2, "description": "permit in ip from any to any"},
+        ],
+    }
+    video_rule = {
+        "qos": {
+            "index": 2,
+            "arp": {
+                "priority_level": 2,
+                "pre_emption_capability": 1,
+                "pre_emption_vulnerability": 1,
+            },
+        },
+        "flow": [
+            {"direction": 1, "description": "permit out ip from any to any"},
+            {"direction": 2, "description": "permit in ip from any to any"},
+        ],
+    }
+    sessions = [{
+        "name": "internet",
+        "type": 3,
+        "qos": {
+            "index": 9,
+            "arp": {
+                "priority_level": 8,
+                "pre_emption_capability": 1,
+                "pre_emption_vulnerability": 2,
+            },
+        },
+        "ambr": {
+            "downlink": {"value": 1, "unit": 3},
+            "uplink": {"value": 1, "unit": 3},
+        },
+    }]
+    if ims:
+        sessions.append({
+            "name": "ims",
+            "type": 3,
+            "qos": {
+                "index": 5,
+                "arp": {
+                    "priority_level": 1,
+                    "pre_emption_capability": 1,
+                    "pre_emption_vulnerability": 1,
+                },
+            },
+            "ambr": {
+                "downlink": {"value": 1, "unit": 3},
+                "uplink": {"value": 1, "unit": 3},
+            },
+            "pcc_rule": [audio_rule, video_rule],
+        })
     return {
         "schema_version": 1,
         "imsi": imsi,
@@ -59,38 +121,7 @@ def build_subscriber(imsi, msisdn, ki, opc):
         "slice": [{
             "sst": 1,
             "default_indicator": True,
-            "session": [{
-                "name": "internet",
-                "type": 3,
-                "qos": {
-                    "index": 9,
-                    "arp": {
-                        "priority_level": 8,
-                        "pre_emption_capability": 1,
-                        "pre_emption_vulnerability": 2,
-                    },
-                },
-                "ambr": {
-                    "downlink": {"value": 1, "unit": 3},
-                    "uplink": {"value": 1, "unit": 3},
-                },
-                # "pcc_rule": [{
-                #     "flow": [
-                #         {"direction": 1,
-                #          "description": "permit out ip from any to 10.45.0.0/16"},
-                #         {"direction": 2,
-                #          "description": "permit out ip from 10.45.0.0/16 to any"},
-                #     ],
-                #     "qos": {
-                #         "index": 9,
-                #         "arp": {
-                #             "priority_level": 8,
-                #             "pre_emption_capability": 1,
-                #             "pre_emption_vulnerability": 2,
-                #         },
-                #     },
-                # }],
-            }],
+            "session": sessions,
         }],
         "access_restriction_data": 32,
         "subscriber_status": 0,
@@ -110,6 +141,8 @@ def main():
                         help="Path to keys.csv (default: <source-dir>/keys.csv)")
     parser.add_argument("--imsi-provision", default=None,
                         help="Path to IMSI_Provision_*.csv (auto-detected from source-dir if omitted)")
+    parser.add_argument("--ims", action="store_true",
+                        help="Include IMS APN session for each subscriber")
     parser.add_argument("--dry-run", action="store_true",
                         help="Print what would be done without writing to DB")
     args = parser.parse_args()
@@ -166,7 +199,7 @@ def main():
     for imsi in imsis:
         k = keys[imsi]
         p = provisions[imsi]
-        doc = build_subscriber(imsi, p["msisdn"], k["ki"], k["opc"])
+        doc = build_subscriber(imsi, p["msisdn"], k["ki"], k["opc"], ims=args.ims)
 
         result = db.subscribers.update_one(
             {"imsi": imsi},
