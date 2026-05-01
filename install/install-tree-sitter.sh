@@ -7,7 +7,11 @@ function die() {
   exit 1
 }
 
-${SUDO} dnf install -y clang-devel || die "Failed to install libclang"
+if !command -v clang++ >/dev/null 2>&1; then
+  echo "No clang++ found, exiting"
+  exit 1
+  # ${SUDO} dnf install -y clang-devel || die "Failed to install libclang"
+fi
 
 . "$HOME/.cargo/env"
 
