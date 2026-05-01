@@ -319,3 +319,6 @@ alias reboot="${SUDO} reboot"
 alias cld=$'su -l - claude-runner -c "zsh -ic \'cd $(pwd) && exec claude --allow-dangerously-skip-permissions\'"'
 alias cldp='su - claude-runner'
 
+# Remove duplicates from path
+typeset -U path PATH
+path=(${path})
