@@ -38,7 +38,6 @@ return {
                     map('gd', ts_bi.lsp_definitions, '[G]oto [D]efinition')
                     map('gI', ts_bi.lsp_implementations, '[G]oto [I]mplementation')
 
-
                     -- Jump to the type of the word under your cursor.
                     --  Useful when you're not sure what type a variable is and you want to see
                     --  the definition of its *type*, not where it was *defined*.
@@ -103,15 +102,9 @@ return {
                 require('cmp_nvim_lsp').default_capabilities()
             )
 
-            local useMason = true
-            local clangPath = 'clangd'
-
-            if vim.fn.executable('/opt/llvm-19/bin/clangd') == 1 then
-                clangPath = "/opt/llvm-19/bin/clangd"
-                useMason = false
-            elseif  vim.fn.executable('clangd') == 1 then
-                useMason = false
-            end
+            local resolvedClangd = vim.fn.exepath('clangd')
+            local usePreinstalledClangd = resolvedClangd ~= ''
+            local clangdPath = usePreinstalledClangd and resolvedClangd or 'clangd'
 
             -- Enable the following language servers
             --  Feel free to add/remove any LSPs that you want here. They will automatically be installed.
@@ -124,31 +117,32 @@ return {
             --        For example, to see the options for `lua_ls`, you could go to: https://luals.github.io/wiki/settings/
             local servers = {
                 clangd = {
-                    mason = useMason,
+                    mason = not usePreinstalledClangd,
                     cmd = {
-                        clangPath,
-                        "--offset-encoding=utf-16",
-                        "--background-index",
-                        string.format("-j=%d",#vim.loop.cpu_info()),
-                        "--all-scopes-completion",
-                        "--clang-tidy",
-                        "--cross-file-rename",
+                        clangdPath,
+                        '--offset-encoding=utf-16',
+                        '--background-index',
+                        string.format('-j=%d', #vim.loop.cpu_info()),
+                        '--all-scopes-completion',
+                        '--clang-tidy',
+                        '--cross-file-rename',
                         -- "--compile_args_from=filesystem", -- lsp-> does not come from compie_commands.json
-                        "--completion-parse=always",
-                        "--completion-style=detailed",
-                        "--cross-file-rename",
-                        "--debug-origin",
-                        "--enable-config", -- clangd 11+ supports reading from .clangd configuration file
+                        '--completion-parse=always',
+                        '--completion-style=detailed',
+                        '--cross-file-rename',
+                        '--debug-origin',
+                        '--enable-config', -- clangd 11+ supports reading from .clangd configuration file
                         -- "--fallback-style=Qt",
-                        "--folding-ranges",
-                        "--function-arg-placeholders",
-                        "--header-insertion=never", -- iwyu
-                        "--pch-storage=memory", -- could also be disk
-                        "--suggest-missing-includes",
+                        '--folding-ranges',
+                        '--function-arg-placeholders',
+                        '--header-insertion=never', -- iwyu
+                        '--pch-storage=memory',     -- could also be disk
+                        '--suggest-missing-includes',
                         -- "--resource-dir="
-                        "--log=error",
-                        "--query-driver=/opt/rh/gcc-toolset-10/root/bin/g++,/usr/bin/**/clang-*,/bin/clang,/bin/clang++,/usr/bin/gcc,/usr/bin/g++,/opt/llvm-19/bin/clang,/opt/llvm-19/bin/clang++",
-                        -- "--query-driver=/usr/bin/g++", 
+                        '--log=error',
+                        -- allow list of binaries alloed to run by clangd when it discovers standard library
+                        '--query-driver=/opt/rh/*/root/bin/g*,/usr/bin/gcc,/usr/bin/g++,/usr/bin/**/clang*,/bin/clang*,/opt/llvm-*/bin/clang*',
+                        -- "--query-driver=/usr/bin/g++",
                     },
                 },
                 rust_analyzer = {
@@ -200,19 +194,30 @@ return {
             }
 
             if vim.fn.executable('go') == 1 then
-                servers['gopls'] = {
-                    filetypes = {'go'},
+                servers.gopls = {
+                    filetypes = { 'go' },
                 }
             end
-            local haveNode = vim.fn.executable('node') == 1
+
+            if vim.fn.executable('stylua') == 1 then
+                servers.stylua = {
+                    -- stylua is intentionally not Mason-managed: prebuilt binaries on
+                    -- the registry require a newer glibc than some target systems have.
+                    -- If `stylua` is on PATH (e.g. musl prebuilt or `cargo install stylua`),
+                    -- nvim-lspconfig's stylua entry will pick it up and enable `--lsp` mode.
+                    mason = false,
+                    filetypes = { 'lua' },
+                }
+            end
 
             if vim.fn.executable('jinja') == 1 or vim.fn.executable('jinja2') == 1 then
-                servers['jinja_lsp']={
-                    filetypes = {'jinja'},
+                servers.jinja_lsp = {
+                    filetypes = { 'jinja' },
                 }
             end
-            if haveNode then
-                servers['pyright'] = { }
+
+            if vim.fn.executable('node') == 1 then
+                servers.pyright = {}
             end
 
             -- Ensure the servers and tools above are installed
@@ -223,20 +228,10 @@ return {
             --  You can press `g?` for help in this menu
             require('mason').setup()
 
-            -- You can add other tools here that you want Mason to install
-            -- for you, so that they are available from within Neovim.
-            local ensure_installed = vim.tbl_keys(servers or {})
-            -- local ensure_installed =  {}
-            ensure_installed['clangd'] = nil -- We use the custom clangd configuration above
-            vim.list_extend(ensure_installed, {
-                'stylua', -- Used to format lua code
-            })
-
-            if haveNode then
-                vim.list_extend(ensure_installed, {
-                    'pyright',
-                })
-            end
+            local ensure_installed = vim.iter(servers)
+                :filter(function(_, cfg) return cfg.mason ~= false end)
+                :map(function(name, _) return name end)
+                :totable()
 
             require('mason-tool-installer').setup({
                 ensure_installed = ensure_installed,
