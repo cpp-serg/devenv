@@ -36,7 +36,6 @@ ADDED_PATHS=""
 ADDED_MANPATHS=""
 TOOL_ROOTS=(
     /opt/tools
-    /opt/llvm-19
     ${HOME}/.local
     /opt/valgrind
     /opt/asn1c
@@ -46,6 +45,12 @@ TOOL_ROOTS=(
     ${HOME}/go
     /opt/go
 )
+
+# latest_llvm llvm
+latest_llvm=(/opt/llvm-*(NoN[-1]))
+if (( $#latest_llvm )); then
+    TOOL_ROOTS+=("$latest_llvm")
+fi
 
 for tool in "${TOOL_ROOTS[@]}" ; do
     [[ -d "${tool}" && -x "${tool}" ]] || continue
