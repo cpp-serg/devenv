@@ -76,3 +76,4 @@ function git-here
     git commit -m "initial commit"
 }
 
+alias gdt='git difft'
