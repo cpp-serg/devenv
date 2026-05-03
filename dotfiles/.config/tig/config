@@ -1,0 +1,73 @@
+# ~/.config/tig/config
+
+# ── Display ───────────────────────────────────────────────────────────────
+set line-graphics       = utf-8
+set tab-size            = 4
+set wrap-lines          = no
+set vertical-split      = auto
+set split-view-height   = 70%
+# diff-highlight: tig's curses renderer can't handle delta's 24-bit/background
+# colors as an inline filter. Use the `D` keybinding for delta-rendered diffs.
+# To enable inline word-highlighting, install git's contrib/diff-highlight Perl
+# script in PATH and set `diff-highlight = true`.
+set diff-highlight      = no
+set show-changes        = true
+set ignore-case         = smart-case
+
+# ── Mouse / scrolling ─────────────────────────────────────────────────────
+set mouse               = true
+set mouse-scroll        = 3
+
+# ── Main view (commit list) ───────────────────────────────────────────────
+set main-view = id:yes date:relative-compact author:abbreviated commit-title:yes,graph,refs,overflow=no
+set commit-order        = topo
+set refresh-mode        = auto
+
+# ── Diff view ─────────────────────────────────────────────────────────────
+# Tuned to surface STRUCTURAL changes and hide formatting noise:
+#   -w                       ignore all whitespace (kills reindentation noise)
+#   --ignore-blank-lines     hide blank-line-only churn
+#   --diff-algorithm=histogram  cleaner hunks on moves/refactors than default myers
+#   -C -C                    detect renames + copies (incl. from unmodified files)
+#   -U10                     10 lines of context around hunks (vs. default 3)
+#   --stat                   per-file change summary at top
+# Caveat: -w hides whitespace-only changes — bad for Python/YAML/Makefile.
+# Use the `W` keybinding below to switch to a literal (whitespace-aware) view.
+set diff-options        = -w --ignore-blank-lines --diff-algorithm=histogram -C -C -U10 --stat
+set blame-options       = -w -C -C -C
+
+# ── External viewers: delta and difftastic ────────────────────────────────
+# D = pretty-rendered diff via delta (good for normal review)
+# F = structural / semantic diff via difftastic (good after formatter / refactor)
+#
+# Both run in a separate pager and return to tig on quit; tig's interactive
+# views (staging hunks with `!`, line nav) are unaffected.
+
+bind generic D !sh -c "git show --color=always --no-ext-diff %(commit) | delta --paging=always"
+bind status  D !sh -c "git diff  --color=always --no-ext-diff | delta --paging=always"
+bind stage   D !sh -c "git diff  --color=always --no-ext-diff -- %(file) | delta --paging=always"
+
+bind generic F !sh -c "DFT_COLOR=always DFT_WIDTH=$(tput cols) DFT_PARSE_ERROR_LIMIT=10000000 DFT_GRAPH_LIMIT=100000000 DFT_DISPLAY=side-by-side GIT_EXTERNAL_DIFF=difft git show --ext-diff %(commit) | less -R"
+bind status  F !sh -c "DFT_COLOR=always DFT_WIDTH=$(tput cols) DFT_PARSE_ERROR_LIMIT=10000000 DFT_GRAPH_LIMIT=100000000 DFT_DISPLAY=side-by-side GIT_EXTERNAL_DIFF=difft git diff --ext-diff | less -R"
+bind stage   F !sh -c "DFT_COLOR=always DFT_WIDTH=$(tput cols) DFT_PARSE_ERROR_LIMIT=10000000 DFT_GRAPH_LIMIT=100000000 DFT_DISPLAY=side-by-side GIT_EXTERNAL_DIFF=difft git diff --ext-diff -- %(file) | less -R"
+
+# ── Convenience bindings ──────────────────────────────────────────────────
+bind main    G  move-last-line
+bind generic g  move-first-line
+bind generic <Ctrl-f> move-page-down
+bind generic <Ctrl-b> move-page-up
+
+# Copy current commit hash (works on most terminals; needs xclip / wl-copy / pbcopy)
+bind main    Y !sh -c "printf %s %(commit) | (xclip -selection clipboard 2>/dev/null || pbcopy 2>/dev/null || wl-copy 2>/dev/null)"
+
+# Open file at current line in $EDITOR
+bind diff    e :edit %(file)
+bind blame   e :edit %(file)
+
+# Toggle structural-vs-literal diff view:
+#   w → lenient (default): hide whitespace, blank lines, use histogram
+#   W → literal: show every whitespace change (use for security review)
+bind diff    w :set diff-options = -w --ignore-blank-lines --diff-algorithm=histogram -C -C -U10 --stat
+bind diff    W :set diff-options = --diff-algorithm=histogram -C -C -U10 --stat
+
+# vim: set ft=tigrc :
