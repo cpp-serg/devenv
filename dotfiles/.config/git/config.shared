@@ -29,6 +29,15 @@
            DFT_STRIP_CR=on \
            DFT_SKIP_UNCHANGED=true \
            git -c diff.external=difft -c core.pager='less -R' diff"
+    showt = "!DFT_PARSE_ERROR_LIMIT=10000000 \
+           DFT_GRAPH_LIMIT=100000000 \
+           DFT_BYTE_LIMIT=100000000 \
+           DFT_DISPLAY=side-by-side \
+           DFT_CONTEXT=10 \
+           DFT_TAB_WIDTH=4 \
+           DFT_STRIP_CR=on \
+           DFT_SKIP_UNCHANGED=true \
+           git -c diff.external=difft -c core.pager='less -R' show --ext-diff"
 
 [core]
     pager = delta

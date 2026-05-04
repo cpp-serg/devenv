@@ -77,3 +77,4 @@ function git-here
 }
 
 alias gdt='git difft'
+alias gsht='git showt'
