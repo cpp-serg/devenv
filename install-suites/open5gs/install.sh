@@ -69,8 +69,8 @@ declare -A BUILD_IP=(
     [hss]=127.0.0.8
 )
 
-# Path to BUILDROOT from the rpmbuild tree (exported by build.sh)
-BUILDROOT="${SCRIPT_DIR}/rpms/rpmbuild/BUILDROOT/open5gs-2.7.7-1.el8.x86_64"
+# Path to BUILDROOT from the rpmbuild tree (exported by build.sh entrypoint)
+BUILDROOT="${SCRIPT_DIR}/rpms/rpmbuild-BUILDROOT/open5gs-2.7.7-1.el8.x86_64"
 
 # Detect primary non-loopback IP of this host
 HOST_IP=$(ip -4 route get 1.0.0.0 2>/dev/null | awk '/src/{print $7; exit}')
@@ -80,8 +80,8 @@ HOST_IP=$(ip -4 route get 1.0.0.0 2>/dev/null | awk '/src/{print $7; exit}')
 # ============================================================
 PRESET_LTE=(mme hss pcrf sgwc sgwu smf upf)
 PRESET_5G=(nrf scp amf ausf udm udr nssf bsf pcf smf upf)
-PRESET_DIAMETER=(hss pcrf )
 PRESET_ALL=(mme hss pcrf sgwc sgwu smf upf nrf scp amf ausf udm udr nssf bsf pcf sepp)
+PRESET_OXIO=(hss pcrf)
 
 # All known components (display order for checklist)
 ALL_COMPONENTS=(mme hss pcrf sgwc sgwu smf upf nrf scp amf ausf udm udr pcf nssf bsf sepp)
@@ -90,6 +90,7 @@ ALL_COMPONENTS=(mme hss pcrf sgwc sgwu smf upf nrf scp amf ausf udm udr pcf nssf
 SERVICE_ORDER_LTE=(hssd pcrfd sgwcd sgwud smfd upfd mmed)
 SERVICE_ORDER_5G=(nrfd scpd ausfd udmd udrd pcfd nssfd bsfd smfd upfd amfd)
 SERVICE_ORDER_ALL=(nrfd scpd hssd pcrfd ausfd udmd udrd pcfd nssfd bsfd sgwcd sgwud smfd upfd mmed amfd seppd)
+SERVICE_ORDER_OXIO=(hssd pcrfd)
 
 # ============================================================
 # Dialog detection
@@ -118,10 +119,10 @@ show_preset_dialog() {
     detect_dialog
     local choice
     choice=$($DIALOG_CMD --title "Open5GS Component Selection" \
-        --radiolist "Select deployment type:" 15 50 4 \
+        --radiolist "Select deployment type:" 17 50 4 \
         "lte"  "LTE EPC (4G)"      ON \
-        "dia"  "Diameter infra (HSS, PCRF)"      ON \
         "5g"   "5G Core"            OFF \
+        "oxio" "Oxio (HSS + PCRF)" OFF \
         "all"  "All components"     OFF \
         3>&1 1>&2 2>&3) || return 1
 
@@ -205,10 +206,10 @@ show_main_dialog() {
 
 apply_preset() {
     case "$1" in
-        lte) SELECTED_COMPONENTS=("${PRESET_LTE[@]}") ;;
-        dia) SELECTED_COMPONENTS=("${PRESET_DIAMETER[@]}") ;;
-        5g)  SELECTED_COMPONENTS=("${PRESET_5G[@]}") ;;
-        all) SELECTED_COMPONENTS=("${PRESET_ALL[@]}") ;;
+        lte)  SELECTED_COMPONENTS=("${PRESET_LTE[@]}") ;;
+        5g)   SELECTED_COMPONENTS=("${PRESET_5G[@]}") ;;
+        oxio) SELECTED_COMPONENTS=("${PRESET_OXIO[@]}") ;;
+        all)  SELECTED_COMPONENTS=("${PRESET_ALL[@]}") ;;
         *)
             # Accept single component or comma-separated list (e.g. mme or mme,hss,pcrf)
             IFS=',' read -ra SELECTED_COMPONENTS <<< "$1"
@@ -222,6 +223,7 @@ apply_preset() {
 SELECTED_COMPONENTS=()
 SELECTED_PRESET=""
 OPT_SELECT=0
+OPT_NODEPS=0
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -231,14 +233,17 @@ while [[ $# -gt 0 ]]; do
             SELECTED_PRESET="$2"; shift 2 ;;
         -s|--select)
             OPT_SELECT=1; shift ;;
+        --nodeps)
+            OPT_NODEPS=1; shift ;;
         -h|--help)
-            echo "Usage: $0 [--rpm-dir DIR] [-c|--components lte|5g|all|comp1,comp2,...] [-s|--select]"
+            echo "Usage: $0 [--rpm-dir DIR] [-c|--components lte|5g|all|comp1,comp2,...] [-s|--select] [--nodeps]"
             echo ""
             echo "Options:"
             echo "  --rpm-dir DIR       Path to RPM directory (default: ./rpms)"
-            echo "  -c, --components P  Use preset (lte, 5g, all) or comma-separated list"
+            echo "  -c, --components P  Use preset (lte, 5g, all, oxio) or comma-separated list"
             echo "                      e.g. -c mme,hss,pcrf,sgwc,sgwu,smf,upf"
             echo "  -s, --select        Open checklist dialog to customize selection"
+            echo "  --nodeps            Skip installing dependencies (MongoDB, system libs, WebUI, etc.)"
             echo ""
             echo "No flags: interactive preset selection → component checklist"
             exit 0 ;;
@@ -290,6 +295,8 @@ get_ordered_daemons() {
         order=("${SERVICE_ORDER_ALL[@]}")
     elif is_selected amf; then
         order=("${SERVICE_ORDER_5G[@]}")
+    elif ! is_selected mme && is_selected hss; then
+        order=("${SERVICE_ORDER_OXIO[@]}")
     else
         order=("${SERVICE_ORDER_LTE[@]}")
     fi
@@ -887,8 +894,10 @@ get_firewall_ports() {
 verify_rpms common "${SELECTED_COMPONENTS[@]}"
 
 # Core infrastructure
-install_mongodb
-install_system_deps
+if [[ ${OPT_NODEPS} -eq 0 ]]; then
+    install_mongodb
+    install_system_deps
+fi
 
 # Install RPMs
 install_rpms common "${SELECTED_COMPONENTS[@]}"
@@ -931,13 +940,15 @@ get_ordered_daemons
 enable_services "${ORDERED_DAEMONS[@]}"
 
 # Tooling
-install_dbctl
-install_python_db_lib
-install_webui
+if [[ ${OPT_NODEPS} -eq 0 ]]; then
+    install_dbctl
+    install_python_db_lib
+    install_webui
 
-# Firewall
-get_firewall_ports
-open_firewall_ports "${FIREWALL_PORTS[@]}"
+    # Firewall
+    get_firewall_ports
+    open_firewall_ports "${FIREWALL_PORTS[@]}"
+fi
 
 # ============================================================
 # Summary

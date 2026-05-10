@@ -185,15 +185,15 @@ create_run_dirs() {
 
 generate_fd_certs() {
     local name="$1"
-    if [[ ! -f "/etc/freeDiameter/${name}.cert.pem" || ! -f "/etc/freeDiameter/${name}.key.pem" ]]; then
-        $SUDO mkdir -p /etc/freeDiameter
+    if [[ ! -f "/etc/open5gs/freeDiameter/${name}.cert.pem" || ! -f "/etc/open5gs/freeDiameter/${name}.key.pem" ]]; then
+        $SUDO mkdir -p /etc/open5gs/freeDiameter
         $SUDO openssl req -x509 -newkey rsa:2048 -nodes -days 3650 \
             -subj "/CN=${name}.localdomain" \
-            -keyout "/etc/freeDiameter/${name}.key.pem" \
-            -out "/etc/freeDiameter/${name}.cert.pem" \
+            -keyout "/etc/open5gs/freeDiameter/${name}.key.pem" \
+            -out "/etc/open5gs/freeDiameter/${name}.cert.pem" \
             2>/dev/null
-        $SUDO chown open5gs:open5gs "/etc/freeDiameter/${name}.key.pem" "/etc/freeDiameter/${name}.cert.pem"
-        $SUDO chmod 640 "/etc/freeDiameter/${name}.key.pem"
+        $SUDO chown open5gs:open5gs "/etc/open5gs/freeDiameter/${name}.key.pem" "/etc/open5gs/freeDiameter/${name}.cert.pem"
+        $SUDO chmod 640 "/etc/open5gs/freeDiameter/${name}.key.pem"
         echo "Generated self-signed TLS certs for ${name}."
     fi
 }
