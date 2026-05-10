@@ -1,18 +1,14 @@
 ## ---------------------------------------------------------------------------
-## Dockerfile — build Open5GS RPMs on Rocky Linux 8.10
+## Dockerfile — Open5GS RPM build environment for Rocky Linux 8.10
+##
+## This image contains only the build toolchain and dependencies.
+## Source code, ccache, and output directory are mounted at runtime.
 ##
 ## Usage:
-##   podman build -t open5gs-rpm-builder .
-##   podman run --name open5gs-build -v "$PWD/rpms:/output:Z" open5gs-rpm-builder
-##
-## The resulting RPMs will appear in ./rpms/ on the host.
-## The full rpmbuild tree (BUILD, BUILDROOT, RPMS) is at ./rpms/rpmbuild/.
+##   See build.sh
 ## ---------------------------------------------------------------------------
 
-FROM rockylinux:8.10 AS builder
-
-ARG OPEN5GS_VERSION=2.7.7
-ARG OPEN5GS_REPO=https://github.com/open5gs/open5gs.git
+FROM rockylinux:8.10
 
 # ---------- enable repos & install base tools ----------
 RUN dnf -y install epel-release dnf-plugins-core && \
@@ -26,7 +22,8 @@ RUN dnf -y install \
         gcc gcc-c++ \
         ninja-build cmake \
         bison flex \
-        pkgconfig python3 python3-pip
+        pkgconfig python3 python3-pip \
+        ccache
 
 # Rocky 8: python3.6 is too old for modern meson. Use python3.9.
 # Install meson to system site-packages (rpmbuild strips /usr/local/).
@@ -52,43 +49,21 @@ RUN dnf -y install \
         systemd-rpm-macros \
     && dnf clean all
 
+# ---------- configure ccache ----------
+# Put ccache wrappers first in PATH so gcc/g++ calls go through ccache
+RUN ln -s /usr/bin/ccache /usr/local/bin/gcc && \
+    ln -s /usr/bin/ccache /usr/local/bin/g++ && \
+    ln -s /usr/bin/ccache /usr/local/bin/cc && \
+    ln -s /usr/bin/ccache /usr/local/bin/c++
+
+ENV CCACHE_DIR=/root/.ccache
+ENV PATH="/usr/local/bin:${PATH}"
+
 # ---------- set up rpmbuild tree ----------
 RUN rpmdev-setuptree
 
-# ---------- clone source & create tarball ----------
-RUN git clone --depth 1 --branch v${OPEN5GS_VERSION} ${OPEN5GS_REPO} \
-        /tmp/open5gs-${OPEN5GS_VERSION}
+# ---------- entrypoint ----------
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 
-# Meson subprojects: download wraps upfront so rpmbuild doesn't need network
-RUN cd /tmp/open5gs-${OPEN5GS_VERSION} && \
-    meson subprojects download || true
-
-# Create the source tarball expected by the spec's %setup -q
-RUN tar czf /root/rpmbuild/SOURCES/open5gs-${OPEN5GS_VERSION}.tar.gz \
-        -C /tmp open5gs-${OPEN5GS_VERSION} && \
-    rm -rf /tmp/open5gs-${OPEN5GS_VERSION}
-
-# ---------- copy spec ----------
-COPY open5gs.spec /root/rpmbuild/SPECS/open5gs.spec
-
-# ---------- build RPMs (--noclean keeps BUILDROOT) ----------
-# QA_RPATHS=0x0001: allow standard RPATHs (/usr/lib64) that meson embeds
-RUN QA_RPATHS=0x0001 rpmbuild -bb --noclean \
-        --undefine=_disable_source_fetch \
-        /root/rpmbuild/SPECS/open5gs.spec \
-        2>&1 | tee /tmp/rpmbuild.log || \
-    { echo "=== RPM BUILD FAILED ===" ; tail -100 /tmp/rpmbuild.log ; exit 1 ; }
-
-# Drop the source tarball to save space in the output layer
-RUN rm -f /root/rpmbuild/SOURCES/*.tar.gz
-
-# ---------- lightweight output stage ----------
-FROM rockylinux:8.10-minimal
-
-COPY --from=builder /root/rpmbuild/BUILD/ /rpmbuild/BUILD/
-COPY --from=builder /root/rpmbuild/BUILDROOT/ /rpmbuild/BUILDROOT/
-COPY --from=builder /root/rpmbuild/RPMS/ /rpmbuild/RPMS/
-COPY --from=builder /root/rpmbuild/SPECS/ /rpmbuild/SPECS/
-
-# Default: copy RPMs and rpmbuild tree to /output
-CMD ["sh", "-c", "cp -rv /rpmbuild/RPMS/*/*.rpm /output/ && cp -a /rpmbuild /output/rpmbuild && echo '=== Done ==='"]
+ENTRYPOINT ["/entrypoint.sh"]

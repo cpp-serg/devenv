@@ -47,6 +47,25 @@ fi
 echo "==> Downloading meson subprojects ..."
 (cd "${SOURCE_DIR}" && meson subprojects download 2>/dev/null || true)
 
+# ---------- apply patches ----------
+PATCHES_DIR="${SCRIPT_DIR}/patches"
+if [[ -d "${PATCHES_DIR}" ]]; then
+    shopt -s nullglob
+    patches=("${PATCHES_DIR}"/*.patch)
+    shopt -u nullglob
+    if [[ ${#patches[@]} -gt 0 ]]; then
+        echo "==> Applying patches from ${PATCHES_DIR} ..."
+        for p in "${patches[@]}"; do
+            if (cd "${SOURCE_DIR}" && git apply --check "$p" 2>/dev/null); then
+                echo "  Applying: $(basename "$p")"
+                (cd "${SOURCE_DIR}" && git apply "$p")
+            else
+                echo "  Already applied or N/A, skipping: $(basename "$p")"
+            fi
+        done
+    fi
+fi
+
 # ---------- prepare host directories ----------
 mkdir -p "${OUTPUT_DIR}" "${CCACHE_DIR}"
 
@@ -59,10 +78,14 @@ ${CTR} build "${CTR_ARGS[@]}" -t "${IMAGE_NAME}" "${SCRIPT_DIR}"
 CONTAINER_NAME="open5gs-build"
 ${CTR} rm -f "${CONTAINER_NAME}" 2>/dev/null || true
 
+# Mount source directly into rpmbuild's BUILD directory so meson
+# reuses its build tree across runs (true incremental builds).
+BUILD_MOUNT="/root/rpmbuild/BUILD/open5gs-${OPEN5GS_VERSION}"
+
 echo "==> Starting build container ..."
 ${CTR} run --name "${CONTAINER_NAME}" \
     -e "OPEN5GS_VERSION=${OPEN5GS_VERSION}" \
-    -v "${SOURCE_DIR}:/src:ro,Z" \
+    -v "${SOURCE_DIR}:${BUILD_MOUNT}:Z" \
     -v "${SCRIPT_DIR}:/spec:ro,Z" \
     -v "${OUTPUT_DIR}:/output:Z" \
     -v "${CCACHE_DIR}:/root/.ccache:Z" \

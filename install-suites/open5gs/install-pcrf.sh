@@ -157,26 +157,26 @@ logger:
 db_uri: mongodb://localhost/open5gs
 
 pcrf:
-  freeDiameter: /etc/freeDiameter/pcrf.conf
+  freeDiameter: /etc/open5gs/freeDiameter/pcrf.conf
 PCRF_EOF
 
 # freeDiameter config for PCRF (Gx server, Rx server)
-PCRF_FD_CONF="/etc/freeDiameter/pcrf.conf"
+PCRF_FD_CONF="/etc/open5gs/freeDiameter/pcrf.conf"
 if [[ -f "${PCRF_FD_CONF}" ]]; then
     $SUDO cp -n "${PCRF_FD_CONF}" "${PCRF_FD_CONF}.bak"
 fi
 
 $SUDO mkdir -p "$(dirname "${PCRF_FD_CONF}")"
 
-# Generate self-signed TLS certs if missing (freeDiameter requires them even with No_TLS)
-if [[ ! -f /etc/freeDiameter/pcrf.cert.pem || ! -f /etc/freeDiameter/pcrf.key.pem ]]; then
+# Generate self-signed TLS certs if missing
+if [[ ! -f /etc/open5gs/freeDiameter/pcrf.cert.pem || ! -f /etc/open5gs/freeDiameter/pcrf.key.pem ]]; then
     $SUDO openssl req -x509 -newkey rsa:2048 -nodes -days 3650 \
         -subj "/CN=pcrf.localdomain" \
-        -keyout /etc/freeDiameter/pcrf.key.pem \
-        -out /etc/freeDiameter/pcrf.cert.pem \
+        -keyout /etc/open5gs/freeDiameter/pcrf.key.pem \
+        -out /etc/open5gs/freeDiameter/pcrf.cert.pem \
         2>/dev/null
-    $SUDO chown open5gs:open5gs /etc/freeDiameter/pcrf.key.pem /etc/freeDiameter/pcrf.cert.pem
-    $SUDO chmod 640 /etc/freeDiameter/pcrf.key.pem
+    $SUDO chown open5gs:open5gs /etc/open5gs/freeDiameter/pcrf.key.pem /etc/open5gs/freeDiameter/pcrf.cert.pem
+    $SUDO chmod 640 /etc/open5gs/freeDiameter/pcrf.key.pem
     echo "Generated self-signed TLS certs for freeDiameter."
 fi
 
@@ -190,9 +190,8 @@ Realm = "localdomain";
 Port = 3868;
 SecPort = 5868;
 
-# TLS — self-signed certs for local/dev use.
-TLS_Cred = "/etc/freeDiameter/pcrf.cert.pem", "/etc/freeDiameter/pcrf.key.pem";
-TLS_CA = "/etc/freeDiameter/pcrf.cert.pem";
+TLS_Cred = "/etc/open5gs/freeDiameter/pcrf.cert.pem", "/etc/open5gs/freeDiameter/pcrf.key.pem";
+TLS_CA = "/etc/open5gs/freeDiameter/pcrf.cert.pem";
 
 # Gx peer: the SMF/PGW-C connects here
 # Uncomment and adjust when integrating with an SMF:
@@ -438,7 +437,7 @@ echo "    WebUI:      systemctl status open5gs-webui"
 echo ""
 echo "  Configuration files:"
 echo "    PCRF:       /etc/open5gs/pcrf.yaml"
-echo "    Diameter:   /etc/freeDiameter/pcrf.conf"
+echo "    Diameter:   /etc/open5gs/freeDiameter/pcrf.conf"
 echo ""
 echo "  DB tools:"
 echo "    CLI:        open5gs-dbctl help"

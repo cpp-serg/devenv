@@ -7,7 +7,8 @@ Release:        1%{?dist}
 Summary:        Open source implementation of 5G Core and EPC
 License:        AGPL-3.0-only
 URL:            https://open5gs.org
-Source0:        %{name}-%{version}.tar.gz
+# Source is mounted directly into BUILD dir; no tarball needed
+#Source0:        %{name}-%{version}.tar.gz
 
 BuildRequires:  gcc
 BuildRequires:  gcc-c++
@@ -195,9 +196,12 @@ Open5GS BSF — Binding Support Function.
 # ============================================================
 
 %prep
-%setup -q
+# Source is bind-mounted at %{_builddir}/%{name}-%{version}; skip tarball extraction.
+# -T = don't unpack Source0, -D = don't delete existing directory
+%setup -T -D
 
 # Patch PLMN: replace default 999/70 with 315/010 in MME config template
+# (idempotent — sed won't match if already patched)
 sed -i '/^  gummei:/,/^  tai:/{s/mcc: 999/mcc: 315/;s/mnc: 70/mnc: 010/}' \
     configs/open5gs/mme.yaml.in
 sed -i '/^  tai:/,/^  security:/{s/mcc: 999/mcc: 315/;s/mnc: 70/mnc: 010/}' \
@@ -229,9 +233,6 @@ done
 for f in %{_vpath_builddir}/configs/freeDiameter/*.conf; do
     install -m 0644 "$f" %{buildroot}%{_sysconfdir}/open5gs/freeDiameter/
 done
-
-# Fix freeDiameter config paths in YAML files: /etc/freeDiameter/ → /etc/open5gs/freeDiameter/
-sed -i 's|/etc/freeDiameter/|/etc/open5gs/freeDiameter/|g' %{buildroot}%{_sysconfdir}/open5gs/*.yaml
 
 # --- Systemd service units ---
 install -d %{buildroot}%{_unitdir}

@@ -1,0 +1,536 @@
+From 1d903c5c491af8cac31a717dbff6c24b21412de5 Mon Sep 17 00:00:00 2001
+From: Sergiy Pastukhov <sergiy@jpu.io>
+Date: Sun, 10 May 2026 22:32:59 +0300
+Subject: [PATCH 2/2] Adjust PCRF behavior for IMS audio Rx-derived rules(Rx ->
+ Gx), align wiht OXIO
+
+---
+ lib/diameter/gx/message.c |   9 +
+ lib/diameter/gx/message.h |  15 ++
+ src/pcrf/pcrf-gx-path.c   | 388 +++++++++++++++++++++++++++-----------
+ 3 files changed, 305 insertions(+), 107 deletions(-)
+
+diff --git a/lib/diameter/gx/message.c b/lib/diameter/gx/message.c
+index 99d072958..9aa1b9983 100644
+--- a/lib/diameter/gx/message.c
++++ b/lib/diameter/gx/message.c
+@@ -87,6 +87,10 @@ struct dict_object *ogs_diam_gx_access_network_charging_address = NULL;
+ struct dict_object *ogs_diam_gx_access_network_charging_identifier_gx = NULL;
+ struct dict_object *ogs_diam_gx_access_network_charging_identifier_value = NULL;
+ struct dict_object *ogs_diam_gx_an_trusted = NULL;
++struct dict_object *ogs_diam_gx_service_identifier = NULL;
++struct dict_object *ogs_diam_gx_rating_group = NULL;
++struct dict_object *ogs_diam_gx_reporting_level = NULL;
++struct dict_object *ogs_diam_gx_metering_method = NULL;
+ 
+ extern int ogs_dict_gx_entry(char *conffile);
+ 
+@@ -165,5 +169,10 @@ int ogs_diam_gx_init(void)
+     CHECK_dict_search(DICT_AVP, AVP_BY_NAME_ALL_VENDORS, "Access-Network-Charging-Identifier-Value", &ogs_diam_gx_access_network_charging_identifier_value);
+     CHECK_dict_search(DICT_AVP, AVP_BY_NAME_ALL_VENDORS, "AN-Trusted", &ogs_diam_gx_an_trusted);
+ 
++    CHECK_dict_search(DICT_AVP, AVP_BY_NAME_ALL_VENDORS, "Service-Identifier", &ogs_diam_gx_service_identifier);
++    CHECK_dict_search(DICT_AVP, AVP_BY_NAME_ALL_VENDORS, "Rating-Group", &ogs_diam_gx_rating_group);
++    CHECK_dict_search(DICT_AVP, AVP_BY_NAME_ALL_VENDORS, "Reporting-Level", &ogs_diam_gx_reporting_level);
++    CHECK_dict_search(DICT_AVP, AVP_BY_NAME_ALL_VENDORS, "Metering-Method", &ogs_diam_gx_metering_method);
++
+     return 0;
+ }
+diff --git a/lib/diameter/gx/message.h b/lib/diameter/gx/message.h
+index 68d1c0726..582cf7916 100644
+--- a/lib/diameter/gx/message.h
++++ b/lib/diameter/gx/message.h
+@@ -125,6 +125,21 @@ extern struct dict_object *ogs_diam_gx_access_network_charging_identifier_value;
+ #define OGS_DIAM_GX_AN_UNTRUSTED 1
+ extern struct dict_object *ogs_diam_gx_an_trusted;
+ 
++/* Service-Identifier (439, IETF base) — RFC 4006 §8.28
++ * Rating-Group (432, IETF base) — RFC 4006 §8.29
++ * Reporting-Level (1011) / Metering-Method (1007) — TS 29.212 §5.3.12/§5.3.8
++ * Used by the per-sub-component rule-emit path to mirror prod IMS RAR shape. */
++#define OGS_DIAM_GX_REPORTING_LEVEL_SERVICE_IDENTIFIER 0
++#define OGS_DIAM_GX_REPORTING_LEVEL_RATING_GROUP       1
++#define OGS_DIAM_GX_METERING_METHOD_DURATION           0
++#define OGS_DIAM_GX_METERING_METHOD_VOLUME             1
++#define OGS_DIAM_GX_METERING_METHOD_DURATION_VOLUME    2
++#define OGS_DIAM_GX_METERING_METHOD_EVENT              3
++extern struct dict_object *ogs_diam_gx_service_identifier;
++extern struct dict_object *ogs_diam_gx_rating_group;
++extern struct dict_object *ogs_diam_gx_reporting_level;
++extern struct dict_object *ogs_diam_gx_metering_method;
++
+ typedef struct ogs_diam_gx_message_s {
+ #define OGS_DIAM_GX_CMD_CODE_CREDIT_CONTROL                         272
+ #define OGS_DIAM_GX_CMD_RE_AUTH                                     258
+diff --git a/src/pcrf/pcrf-gx-path.c b/src/pcrf/pcrf-gx-path.c
+index fda22aff2..2fe3923f3 100644
+--- a/src/pcrf/pcrf-gx-path.c
++++ b/src/pcrf/pcrf-gx-path.c
+@@ -65,6 +65,91 @@ static void pcrf_gx_raa_cb(void *data, struct msg **msg);
+ static int encode_pcc_rule_definition(
+         struct avp *avp, ogs_pcc_rule_t *pcc_rule, int flow_presence);
+ 
++/* Local PCC rule synthesizer for IMS audio Rx-derived rules.
++ * Produces prod-shape RARs:
++ *   - one Charging-Rule-Install per Media-Sub-Component
++ *   - per-sub flows only (RTP or RTCP, not merged)
++ *   - rule name "IMS_AudioRule_<RTP|RTCP>_<af-id1>_<af-id2>"
++ *   - QCI=1, ARP priority=8 PCI=Enabled PVI=Disabled,
++ *     MBR=GBR=max_requested_bandwidth (50k for VoLTE), Precedence=0
++ *   - Service-Identifier=1000, Rating-Group=1000, Reporting-Level=SI,
++ *     Online/Offline=DISABLE, Metering=VOLUME (added by encode helper).
++ * AF-IDs are derived deterministically from (rx_sid, media_comp, sub_idx)
++ * so re-AAR / STR can find the same rule slot. */
++#define IMS_RULE_NAME_MAX 128
++#define IMS_PROD_RULE_RATING_GROUP 1000
++#define IMS_PROD_RULE_SERVICE_ID   1000
++#define IMS_PROD_ARP_PRIORITY      8
++
++static uint64_t ims_fnv64(const uint8_t *data, size_t len, uint64_t seed)
++{
++    uint64_t h = 0xcbf29ce484222325UL ^ seed;
++    for (size_t i = 0; i < len; i++) {
++        h ^= data[i];
++        h *= 0x100000001b3UL;
++    }
++    return h;
++}
++
++static void ims_build_rule_name(
++        char *out, size_t out_sz,
++        const uint8_t *rx_sid, int media_comp_num, int sub_idx, int is_rtcp)
++{
++    uint64_t af1, af2;
++    size_t sid_len = rx_sid ? strlen((const char *)rx_sid) : 0;
++    af1 = ims_fnv64(rx_sid, sid_len,
++            ((uint64_t)media_comp_num << 32) | (uint64_t)sub_idx);
++    af2 = ims_fnv64(rx_sid, sid_len,
++            0x9e3779b97f4a7c15UL ^ (((uint64_t)media_comp_num << 16) | sub_idx));
++    snprintf(out, out_sz, "IMS_AudioRule_%s_%016lx_%016lx",
++             is_rtcp ? "RTCP" : "RTP",
++             (unsigned long)af1, (unsigned long)af2);
++}
++
++static int ims_install_flow_from_one_sub(
++        ogs_pcc_rule_t *pcc_rule, ogs_media_sub_component_t *sub)
++{
++    int i, rv;
++
++    /* Wipe any existing flows; we own this rule per-sub. */
++    for (i = 0; i < pcc_rule->num_of_flow; i++)
++        OGS_FLOW_FREE(&pcc_rule->flow[i]);
++    pcc_rule->num_of_flow = 0;
++
++    for (i = 0; i < sub->num_of_flow &&
++                i < OGS_MAX_NUM_OF_FLOW_IN_MEDIA_SUB_COMPONENT; i++) {
++        ogs_flow_t *gx_flow = NULL;
++        ogs_flow_t *rx_flow = &sub->flow[i];
++
++        if (pcc_rule->num_of_flow >= OGS_MAX_NUM_OF_FLOW_IN_PCC_RULE) {
++            ogs_error("Overflow: Number of Flow per PCC rule");
++            return OGS_ERROR;
++        }
++        gx_flow = &pcc_rule->flow[pcc_rule->num_of_flow];
++
++        /* Reuse existing flow_rx_to_gx via a 1-flow throwaway sub, but the
++         * function is static in lib/proto/types.c, so inline the conversion
++         * here: rewrite "permit in/out" to "permit out" flipping addresses,
++         * mark direction. We mirror what flow_rx_to_gx does. */
++        {
++            char *desc = rx_flow->description;
++            int direction = OGS_FLOW_BIDIRECTIONAL;
++            if (desc) {
++                if (strncmp(desc, "permit out", 10) == 0)
++                    direction = OGS_FLOW_DOWNLINK_ONLY;
++                else if (strncmp(desc, "permit in", 9) == 0)
++                    direction = OGS_FLOW_UPLINK_ONLY;
++            }
++            gx_flow->direction = direction;
++            gx_flow->description = ogs_strdup(desc ? desc : "");
++            if (!gx_flow->description) return OGS_ERROR;
++        }
++        pcc_rule->num_of_flow++;
++        (void)rv;
++    }
++    return OGS_OK;
++}
++
+ static __inline__ struct sess_state *new_state(os0_t sid)
+ {
+     struct sess_state *new = NULL;
+@@ -1120,10 +1205,16 @@ int pcrf_gx_send_rar(
+             goto out;
+         }
+ 
+-        /* Match Media-Component with PCC Rule */
++        /* Match Media-Component with PCC Rule.
++         *
++         * Per-sub-component emission to mirror prod IMS RAR shape: one
++         * Charging-Rule-Install per Media-Sub-Component, separately named
++         * "IMS_AudioRule_<RTP|RTCP>_<af1>_<af2>". Charging metadata
++         * (Service-Identifier, Rating-Group, Reporting-Level, Online,
++         * Offline, Metering-Method) is added by encode_pcc_rule_definition.
++         */
+         for (i = 0; i < rx_message->ims_data.num_of_media_component; i++) {
+-            int flow_presence = 0;
+-            ogs_pcc_rule_t *pcc_rule = NULL;
++            int k;
+             ogs_pcc_rule_t *db_pcc_rule = NULL;
+             uint8_t qos_index = 0;
+             ogs_media_component_t *media_component =
+@@ -1186,99 +1277,113 @@ int pcrf_gx_send_rar(
+                 goto out;
+             }
+ 
+-            for (j = 0; j < rx_sess_data->num_of_pcc_rule; j++) {
+-                if (rx_sess_data->pcc_rule[j].qos.index == qos_index) {
+-                    pcc_rule = &rx_sess_data->pcc_rule[j];
+-                    break;
+-                }
+-            }
+-
+-            if (!pcc_rule) {
+-                pcc_rule =
+-                    &rx_sess_data->pcc_rule[rx_sess_data->num_of_pcc_rule];
+-
+-                /* Device PCC Rule Info from DB Profile */
+-                pcc_rule->name = ogs_msprintf("%s-r%d", db_pcc_rule->name,
+-                    (int)ogs_pool_index(&rx_sess_state_pool, rx_sess_data));
+-                ogs_assert(pcc_rule->name);
+-
+-                memcpy(&pcc_rule->qos, &db_pcc_rule->qos, sizeof(ogs_qos_t));
+-
+-                pcc_rule->flow_status = db_pcc_rule->flow_status;
+-                pcc_rule->precedence = db_pcc_rule->precedence;
+-
+-                /* Install Flow */
+-                flow_presence = 1;
+-                rv = ogs_pcc_rule_install_flow_from_media(
+-                        pcc_rule, media_component);
+-                if (rv != OGS_OK) {
+-                    rx_message->result_code =
+-                        OGS_DIAM_RX_DIAMETER_FILTER_RESTRICTIONS;
+-                    ogs_error("install_flow() failed");
+-                    goto out;
++            /* Iterate sub-components — one PCC rule per sub. */
++            for (k = 0; k < media_component->num_of_sub; k++) {
++                ogs_media_sub_component_t *sub = &media_component->sub[k];
++                ogs_pcc_rule_t *pcc_rule = NULL;
++                int flow_presence = 0;
++                int is_rtcp = (sub->flow_usage == OGS_FLOW_USAGE_RTCP);
++                char rule_name[IMS_RULE_NAME_MAX];
++
++                ims_build_rule_name(rule_name, sizeof(rule_name),
++                        rx_sess_data->sid,
++                        media_component->media_component_number, k, is_rtcp);
++
++                /* Lookup by name (re-AAR idempotency). */
++                for (j = 0; j < rx_sess_data->num_of_pcc_rule; j++) {
++                    if (rx_sess_data->pcc_rule[j].name &&
++                        strcmp(rx_sess_data->pcc_rule[j].name, rule_name) == 0) {
++                        pcc_rule = &rx_sess_data->pcc_rule[j];
++                        break;
++                    }
+                 }
+ 
+-                rx_sess_data->num_of_pcc_rule++;
+-            } else {
+-                int count = 0;
++                if (!pcc_rule) {
++                    if (rx_sess_data->num_of_pcc_rule >=
++                            OGS_MAX_NUM_OF_PCC_RULE) {
++                        ogs_error("Too many PCC rules in Rx session");
++                        rx_message->result_code =
++                            OGS_DIAM_RX_DIAMETER_REQUESTED_SERVICE_NOT_AUTHORIZED;
++                        goto out;
++                    }
++                    pcc_rule = &rx_sess_data->pcc_rule[
++                        rx_sess_data->num_of_pcc_rule];
++
++                    pcc_rule->name = ogs_strdup(rule_name);
++                    ogs_assert(pcc_rule->name);
++
++                    memcpy(&pcc_rule->qos, &db_pcc_rule->qos,
++                            sizeof(ogs_qos_t));
++                    pcc_rule->flow_status = db_pcc_rule->flow_status;
++
++                    /* Prod-shape ARP overrides for IMS audio rules.
++                     * Match satellite_window.pcapng Gx RAR encoding:
++                     *   Pre-emption-Capability   = DISABLED (wire=1)
++                     *   Pre-emption-Vulnerability = ENABLED  (wire=0)
++                     * These get inverted by the PGW when encoding the GTPv2
++                     * Bearer QoS, ending up Enabled/Disabled at the bearer
++                     * level — which matches the satellite CBR. */
++                    pcc_rule->qos.arp.priority_level = IMS_PROD_ARP_PRIORITY;
++                    pcc_rule->qos.arp.pre_emption_capability =
++                        OGS_5GC_PRE_EMPTION_DISABLED;
++                    pcc_rule->qos.arp.pre_emption_vulnerability =
++                        OGS_5GC_PRE_EMPTION_ENABLED;
++
++                    /* Each rule gets the full per-component bandwidth.
++                     * The PGW (PCEF) is expected to apply MAX, not SUM, on
++                     * resource-shared rules — observed in prod regardless of
++                     * Sharing-Key absence. */
++                    pcc_rule->qos.mbr.uplink =
++                        media_component->max_requested_bandwidth_ul ?
++                        media_component->max_requested_bandwidth_ul :
++                        db_pcc_rule->qos.mbr.uplink;
++                    pcc_rule->qos.mbr.downlink =
++                        media_component->max_requested_bandwidth_dl ?
++                        media_component->max_requested_bandwidth_dl :
++                        db_pcc_rule->qos.mbr.downlink;
++                    pcc_rule->qos.gbr.uplink =
++                        media_component->min_requested_bandwidth_ul ?
++                        media_component->min_requested_bandwidth_ul :
++                        db_pcc_rule->qos.gbr.uplink;
++                    pcc_rule->qos.gbr.downlink =
++                        media_component->min_requested_bandwidth_dl ?
++                        media_component->min_requested_bandwidth_dl :
++                        db_pcc_rule->qos.gbr.downlink;
++
++                    pcc_rule->precedence = 0;
++                    pcc_rule->rating_group = IMS_PROD_RULE_RATING_GROUP;
+ 
+-                /* Check Flow */
+-                count = ogs_pcc_rule_num_of_flow_equal_to_media(
+-                        pcc_rule, media_component);
+-                if (count == -1) {
+-                    rx_message->result_code =
+-                        OGS_DIAM_RX_DIAMETER_FILTER_RESTRICTIONS;
+-                    ogs_error("matched_flow() failed");
+-                    goto out;
+-                }
++                    flow_presence = 1;
++                    rv = ims_install_flow_from_one_sub(pcc_rule, sub);
++                    if (rv != OGS_OK) {
++                        rx_message->result_code =
++                            OGS_DIAM_RX_DIAMETER_FILTER_RESTRICTIONS;
++                        ogs_error("ims_install_flow_from_one_sub() failed");
++                        goto out;
++                    }
+ 
+-                if (pcc_rule->num_of_flow != count) {
+-                    /* Re-install Flow */
++                    rx_sess_data->num_of_pcc_rule++;
++                } else {
++                    /* Re-AAR with same rule — refresh flows if changed. */
+                     flow_presence = 1;
+-                    rv = ogs_pcc_rule_install_flow_from_media(
+-                            pcc_rule, media_component);
++                    rv = ims_install_flow_from_one_sub(pcc_rule, sub);
+                     if (rv != OGS_OK) {
+                         rx_message->result_code =
+                             OGS_DIAM_RX_DIAMETER_FILTER_RESTRICTIONS;
+-                        ogs_error("install_flow() failed");
+                         goto out;
+                     }
+                 }
+-            }
+-
+-            /* Update QoS */
+-            rv = ogs_pcc_rule_update_qos_from_media(pcc_rule, media_component);
+-            if (rv != OGS_OK) {
+-                rx_message->result_code =
+-                    OGS_DIAM_RX_DIAMETER_REQUESTED_SERVICE_NOT_AUTHORIZED;
+-                ogs_error("update_qos() failed");
+-                goto out;
+-            }
+-
+-            /* if we failed to get QoS from IMS, apply WEBUI QoS */
+-            if (pcc_rule->qos.mbr.downlink == 0)
+-                pcc_rule->qos.mbr.downlink = db_pcc_rule->qos.mbr.downlink;
+-            if (pcc_rule->qos.mbr.uplink == 0)
+-                pcc_rule->qos.mbr.uplink = db_pcc_rule->qos.mbr.uplink;
+-            if (pcc_rule->qos.gbr.downlink == 0)
+-                pcc_rule->qos.gbr.downlink = db_pcc_rule->qos.gbr.downlink;
+-            if (pcc_rule->qos.gbr.uplink == 0)
+-                pcc_rule->qos.gbr.uplink = db_pcc_rule->qos.gbr.uplink;
+ 
+-            if (charging_rule == 0) {
++                /* One Charging-Rule-Install per rule (matches prod RAR). */
+                 ret = fd_msg_avp_new(
+                         ogs_diam_gx_charging_rule_install, 0, &avp);
+                 ogs_assert(ret == 0);
++                rv = encode_pcc_rule_definition(avp, pcc_rule, flow_presence);
++                ogs_assert(rv == OGS_OK);
++                ret = fd_msg_avp_add(req, MSG_BRW_LAST_CHILD, avp);
++                ogs_assert(ret == 0);
+                 charging_rule = 1;
+             }
+-
+-            rv = encode_pcc_rule_definition(avp, pcc_rule, flow_presence);
+-            ogs_assert(rv == OGS_OK);
+-        }
+-
+-        if (charging_rule == 1) {
+-            ret = fd_msg_avp_add(req, MSG_BRW_LAST_CHILD, avp);
+-            ogs_assert(ret == 0);
+         }
+ 
+     } else if (rx_message->cmd_code ==
+@@ -1687,6 +1792,30 @@ static int encode_pcc_rule_definition(
+     ret = fd_msg_avp_add(avpch1, MSG_BRW_LAST_CHILD, avpch2);
+     ogs_assert(ret == 0);
+ 
++    /* Prod-shape AVP order: Service-Identifier + Rating-Group come BEFORE
++     * Flow-Information (matches TS 29.212 §5.3.4 ABNF and satellite_window
++     * sample). Other charging metadata follows QoS-Information; Precedence
++     * goes at the end. */
++    if (pcc_rule->name &&
++            strncmp(pcc_rule->name, "IMS_AudioRule_", 14) == 0) {
++        ret = fd_msg_avp_new(ogs_diam_gx_service_identifier, 0, &avpch2);
++        ogs_assert(ret == 0);
++        val.u32 = IMS_PROD_RULE_SERVICE_ID;
++        ret = fd_msg_avp_setvalue(avpch2, &val);
++        ogs_assert(ret == 0);
++        ret = fd_msg_avp_add(avpch1, MSG_BRW_LAST_CHILD, avpch2);
++        ogs_assert(ret == 0);
++
++        ret = fd_msg_avp_new(ogs_diam_gx_rating_group, 0, &avpch2);
++        ogs_assert(ret == 0);
++        val.u32 = pcc_rule->rating_group ?
++                  pcc_rule->rating_group : IMS_PROD_RULE_RATING_GROUP;
++        ret = fd_msg_avp_setvalue(avpch2, &val);
++        ogs_assert(ret == 0);
++        ret = fd_msg_avp_add(avpch1, MSG_BRW_LAST_CHILD, avpch2);
++        ogs_assert(ret == 0);
++    }
++
+     if (flow_presence == 1) {
+         for (i = 0; i < pcc_rule->num_of_flow; i++) {
+             ogs_flow_t *flow = &pcc_rule->flow[i];
+@@ -1735,6 +1864,49 @@ static int encode_pcc_rule_definition(
+     ret = fd_msg_avp_add (avpch2, MSG_BRW_LAST_CHILD, avpch3);
+     ogs_assert(ret == 0);
+ 
++    /* Bandwidth AVPs first, then ARP — matches satellite_window order. */
++    if (pcc_rule->qos.mbr.uplink) {
++        ret = fd_msg_avp_new(
++                ogs_diam_gx_max_requested_bandwidth_ul, 0, &avpch3);
++        ogs_assert(ret == 0);
++        val.u32 = ogs_uint64_to_uint32(pcc_rule->qos.mbr.uplink);
++        ret = fd_msg_avp_setvalue (avpch3, &val);
++        ogs_assert(ret == 0);
++        ret = fd_msg_avp_add (avpch2, MSG_BRW_LAST_CHILD, avpch3);
++        ogs_assert(ret == 0);
++    }
++
++    if (pcc_rule->qos.mbr.downlink) {
++        ret = fd_msg_avp_new(
++                ogs_diam_gx_max_requested_bandwidth_dl, 0, &avpch3);
++        ogs_assert(ret == 0);
++        val.u32 = ogs_uint64_to_uint32(pcc_rule->qos.mbr.downlink);
++        ret = fd_msg_avp_setvalue (avpch3, &val);
++        ogs_assert(ret == 0);
++        ret = fd_msg_avp_add (avpch2, MSG_BRW_LAST_CHILD, avpch3);
++        ogs_assert(ret == 0);
++    }
++
++    if (pcc_rule->qos.gbr.uplink) {
++        ret = fd_msg_avp_new(ogs_diam_gx_guaranteed_bitrate_ul, 0, &avpch3);
++        ogs_assert(ret == 0);
++        val.u32 = ogs_uint64_to_uint32(pcc_rule->qos.gbr.uplink);
++        ret = fd_msg_avp_setvalue (avpch3, &val);
++        ogs_assert(ret == 0);
++        ret = fd_msg_avp_add (avpch2, MSG_BRW_LAST_CHILD, avpch3);
++        ogs_assert(ret == 0);
++    }
++
++    if (pcc_rule->qos.gbr.downlink) {
++        ret = fd_msg_avp_new(ogs_diam_gx_guaranteed_bitrate_dl, 0, &avpch3);
++        ogs_assert(ret == 0);
++        val.u32 = ogs_uint64_to_uint32(pcc_rule->qos.gbr.downlink);
++        ret = fd_msg_avp_setvalue (avpch3, &val);
++        ogs_assert(ret == 0);
++        ret = fd_msg_avp_add (avpch2, MSG_BRW_LAST_CHILD, avpch3);
++        ogs_assert(ret == 0);
++    }
++
+     ret = fd_msg_avp_new(ogs_diam_gx_allocation_retention_priority, 0, &avpch3);
+     ogs_assert(ret == 0);
+ 
+@@ -1770,51 +1942,53 @@ static int encode_pcc_rule_definition(
+     ret = fd_msg_avp_add (avpch2, MSG_BRW_LAST_CHILD, avpch3);
+     ogs_assert(ret == 0);
+ 
+-    if (pcc_rule->qos.mbr.uplink) {
+-        ret = fd_msg_avp_new(
+-                ogs_diam_gx_max_requested_bandwidth_ul, 0, &avpch3);
++    ret = fd_msg_avp_add(avpch1, MSG_BRW_LAST_CHILD, avpch2);
++    ogs_assert(ret == 0);
++
++    /* For IMS audio rules: Reporting-Level / Online / Offline /
++     * Metering-Method come AFTER QoS-Information and BEFORE Precedence
++     * (matches satellite_window sample). Service-Identifier / Rating-Group
++     * are emitted earlier, just after Charging-Rule-Name. */
++    if (pcc_rule->name &&
++            strncmp(pcc_rule->name, "IMS_AudioRule_", 14) == 0) {
++
++        /* Reporting-Level = SERVICE_IDENTIFIER_LEVEL (TS 29.212 §5.3.12) */
++        ret = fd_msg_avp_new(ogs_diam_gx_reporting_level, 0, &avpch2);
+         ogs_assert(ret == 0);
+-        val.u32 = ogs_uint64_to_uint32(pcc_rule->qos.mbr.uplink);
+-        ret = fd_msg_avp_setvalue (avpch3, &val);
++        val.u32 = OGS_DIAM_GX_REPORTING_LEVEL_SERVICE_IDENTIFIER;
++        ret = fd_msg_avp_setvalue(avpch2, &val);
+         ogs_assert(ret == 0);
+-        ret = fd_msg_avp_add (avpch2, MSG_BRW_LAST_CHILD, avpch3);
++        ret = fd_msg_avp_add(avpch1, MSG_BRW_LAST_CHILD, avpch2);
+         ogs_assert(ret == 0);
+-    }
+ 
+-    if (pcc_rule->qos.mbr.downlink) {
+-        ret = fd_msg_avp_new(
+-                ogs_diam_gx_max_requested_bandwidth_dl, 0, &avpch3);
++        /* Online = DISABLE_ONLINE (TS 29.212 §5.3.9) */
++        ret = fd_msg_avp_new(ogs_diam_gx_online, 0, &avpch2);
+         ogs_assert(ret == 0);
+-        val.u32 = ogs_uint64_to_uint32(pcc_rule->qos.mbr.downlink);
+-        ret = fd_msg_avp_setvalue (avpch3, &val);
++        val.u32 = OGS_DIAM_GX_DISABLE_ONLINE;
++        ret = fd_msg_avp_setvalue(avpch2, &val);
+         ogs_assert(ret == 0);
+-        ret = fd_msg_avp_add (avpch2, MSG_BRW_LAST_CHILD, avpch3);
++        ret = fd_msg_avp_add(avpch1, MSG_BRW_LAST_CHILD, avpch2);
+         ogs_assert(ret == 0);
+-    }
+ 
+-    if (pcc_rule->qos.gbr.uplink) {
+-        ret = fd_msg_avp_new(ogs_diam_gx_guaranteed_bitrate_ul, 0, &avpch3);
++        /* Offline = DISABLE_OFFLINE (TS 29.212 §5.3.10) */
++        ret = fd_msg_avp_new(ogs_diam_gx_offline, 0, &avpch2);
+         ogs_assert(ret == 0);
+-        val.u32 = ogs_uint64_to_uint32(pcc_rule->qos.gbr.uplink);
+-        ret = fd_msg_avp_setvalue (avpch3, &val);
++        val.u32 = OGS_DIAM_GX_DISABLE_OFFLINE;
++        ret = fd_msg_avp_setvalue(avpch2, &val);
+         ogs_assert(ret == 0);
+-        ret = fd_msg_avp_add (avpch2, MSG_BRW_LAST_CHILD, avpch3);
++        ret = fd_msg_avp_add(avpch1, MSG_BRW_LAST_CHILD, avpch2);
+         ogs_assert(ret == 0);
+-    }
+ 
+-    if (pcc_rule->qos.gbr.downlink) {
+-        ret = fd_msg_avp_new(ogs_diam_gx_guaranteed_bitrate_dl, 0, &avpch3);
++        /* Metering-Method = VOLUME (TS 29.212 §5.3.8) */
++        ret = fd_msg_avp_new(ogs_diam_gx_metering_method, 0, &avpch2);
+         ogs_assert(ret == 0);
+-        val.u32 = ogs_uint64_to_uint32(pcc_rule->qos.gbr.downlink);
+-        ret = fd_msg_avp_setvalue (avpch3, &val);
++        val.u32 = OGS_DIAM_GX_METERING_METHOD_VOLUME;
++        ret = fd_msg_avp_setvalue(avpch2, &val);
+         ogs_assert(ret == 0);
+-        ret = fd_msg_avp_add (avpch2, MSG_BRW_LAST_CHILD, avpch3);
++        ret = fd_msg_avp_add(avpch1, MSG_BRW_LAST_CHILD, avpch2);
+         ogs_assert(ret == 0);
+     }
+ 
+-    ret = fd_msg_avp_add(avpch1, MSG_BRW_LAST_CHILD, avpch2);
+-    ogs_assert(ret == 0);
+-
+     ret = fd_msg_avp_new(ogs_diam_gx_precedence, 0, &avpch2);
+     ogs_assert(ret == 0);
+     val.u32 = pcc_rule->precedence;
+-- 
+2.43.7
+

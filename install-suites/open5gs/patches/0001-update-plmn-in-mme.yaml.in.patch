@@ -1,0 +1,35 @@
+From 9315394fcfe1291c52b06cc04a837a83a102f023 Mon Sep 17 00:00:00 2001
+From: Sergiy Pastukhov <sergiy@jpu.io>
+Date: Sun, 10 May 2026 22:31:58 +0300
+Subject: [PATCH 1/2] update plmn in mme.yaml.in
+
+---
+ configs/open5gs/mme.yaml.in | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/configs/open5gs/mme.yaml.in b/configs/open5gs/mme.yaml.in
+index 39b2a0071..d8aa8f32b 100644
+--- a/configs/open5gs/mme.yaml.in
++++ b/configs/open5gs/mme.yaml.in
+@@ -27,14 +27,14 @@ mme:
+         port: 9090
+   gummei:
+     - plmn_id:
+-        mcc: 999
+-        mnc: 70
++        mcc: 315
++        mnc: 010
+       mme_gid: 2
+       mme_code: 1
+   tai:
+     - plmn_id:
+-        mcc: 999
+-        mnc: 70
++        mcc: 315
++        mnc: 010
+       tac: 1
+   security:
+     integrity_order : [ EIA2, EIA1, EIA0 ]
+-- 
+2.43.7
+
