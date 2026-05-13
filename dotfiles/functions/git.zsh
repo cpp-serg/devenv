@@ -76,5 +76,39 @@ function git-here
     git commit -m "initial commit"
 }
 
-alias gdt='git difft'
-alias gsht='git showt'
+# Forward to `git <cmd>` with a shorthand for recent commits: a "-N" in any of
+# the first <narg> positional args is rewritten to HEAD~N. This lets e.g.
+#   sp-git-show  -2      -> git show  HEAD~2
+#   sp-git-diff  -1 -3   -> git diff  HEAD~1 HEAD~3
+# Usage: _sp-git-fwd <narg> <cmd> [args...]
+function _sp-git-fwd
+{
+    local narg=$1
+    local cmd=$2
+    shift 2
+
+    # rewrite the first <narg> "-N" args -> HEAD~N, pass the rest through
+    local -a fwd
+    local i a
+    for ((i = 1; i <= $#; i++)); do
+        a=${@[i]}
+        if [[ $i -le $narg && $a =~ '^-[0-9]+$' ]]; then
+            fwd+=("HEAD~${a#-}")
+        else
+            fwd+=("$a")
+        fi
+    done
+    git $cmd "${fwd[@]}"
+}
+
+function sp-git-show  { _sp-git-fwd 1 show  "$@" }
+function sp-git-showt { _sp-git-fwd 1 showt "$@" }
+function sp-git-diff  { _sp-git-fwd 2 diff  "$@" }
+function sp-git-difft { _sp-git-fwd 2 difft "$@" }
+
+alias gd='sp-git-diff'
+alias gdt='sp-git-difft'
+alias gsh='sp-git-show'
+alias gsht='sp-git-showt'
+
+alias gdth='git difft HEAD'
