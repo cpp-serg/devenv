@@ -1,0 +1,133 @@
+#!/bin/bash
+# Monitor GTP-C CSR (Create Session Request) status codes on a remote host.
+# Groups tshark output by 10-second buckets and counts unique status combinations.
+#
+# Usage: ./csr-monitor <host>
+
+if [ $# -ne 1 ]; then
+    echo "Usage: $0 <host>" >&2
+    exit 1
+fi
+
+HOST="$1"
+
+ssh "$HOST" "tshark -l -i any -f 'udp port 2123' -Y 'gtpv2.message_type == 33 or gtp.message == 17' -T fields -e frame.time -e gtpv2.message_type -e gtp.message -e gtpv2.cause -e gtp.cause" 2>/dev/null \
+    | sed -u -E 's/[A-Z][a-z]+ +[0-9]+, [0-9]{4} ([0-9]{2}:[0-9]{2}:[0-9])[0-9]\.[0-9]+/\1/' \
+    | stdbuf -oL uniq -c \
+    | awk '
+BEGIN {
+    # GTPv2 cause names (3GPP TS 29.274, Table 8.4-1)
+    v2["16"]="RAccepted";   v2["17"]="RAcceptedPart"; v2["18"]="NewTypeNet"; v2["19"]="NewTypeSingle"
+    v2["64"]="NoCtx";       v2["65"]="InvMsgFmt";     v2["66"]="VerNotSup";  v2["67"]="InvLen"
+    v2["68"]="SvcNotSup";   v2["69"]="ManIEIncorr";   v2["70"]="ManIEMiss";  v2["72"]="SFailure"
+    v2["73"]="NoRes";       v2["74"]="SemErrTFT";     v2["75"]="SynErrTFT";  v2["76"]="SemErrPF"
+    v2["77"]="SynErrPF";    v2["78"]="UnkAPN";        v2["80"]="NoGRE";      v2["81"]="RelocFail"
+    v2["82"]="DeniedRAT";   v2["83"]="PDNNotSup";     v2["84"]="AddrsOcc";   v2["85"]="NoTFTAct"
+    v2["86"]="ProtoNotSup"; v2["87"]="UENoResp";      v2["88"]="UERefuse";   v2["89"]="SvcDenied"
+    v2["90"]="NoPage";      v2["91"]="NoMem";         v2["92"]="AuthFail";   v2["93"]="APNNoSub"
+    v2["94"]="ReqRej";      v2["95"]="PTMSIMis";      v2["96"]="NoIMSI";     v2["97"]="SemErrTAD"
+    v2["98"]="SynErrTAD";   v2["100"]="PeerNoResp";   v2["101"]="Collision"; v2["102"]="NoPageSusp"
+    v2["103"]="CondIEMiss"; v2["104"]="APNRestrInc";  v2["105"]="InvLenPgb"; v2["106"]="NoFwd"
+    v2["107"]="InvReply";   v2["108"]="FbGTPv1";      v2["109"]="InvPeer";   v2["110"]="TempRejHO"
+    v2["111"]="NoLimS1U";   v2["112"]="RejPMIPv6";    v2["113"]="APNCong";   v2["114"]="NoBearer"
+    v2["115"]="UEReAtt";    v2["116"]="MultiPDNNA";   v2["117"]="TgtRestr";  v2["119"]="VPLMNPol"
+    v2["120"]="GTPCCong";   v2["121"]="LateOverlap";  v2["122"]="TimedOut";  v2["123"]="UEPwrSave"
+    v2["124"]="RelocNAS";   v2["125"]="NoOCSAuth";    v2["126"]="NoMultiAcc";v2["127"]="RejUECap"
+    v2["128"]="S1UFail";    v2["129"]="No5GSInterw"
+
+    # GTPv1 cause names (3GPP TS 29.060, Section 7.7.1)
+    v1["128"]="RAccepted";    v1["129"]="NewTypeNet";   v1["130"]="NewTypeSingle"
+    v1["192"]="NonExist";     v1["193"]="InvMsgFmt";    v1["194"]="NoIMSI";        v1["195"]="GPRSDet"
+    v1["196"]="UENoResp";     v1["197"]="UERefuse";     v1["198"]="VerNotSup";     v1["199"]="NoRes"
+    v1["200"]="SvcNotSup";    v1["201"]="ManIEIncorr";  v1["202"]="ManIEMiss";     v1["203"]="OptIEIncorr"
+    v1["204"]="SFailure";     v1["205"]="RoamRestr";    v1["206"]="PTMSIMis";      v1["207"]="GPRSSusp"
+    v1["208"]="AuthFail";     v1["209"]="AuthFail";     v1["210"]="NoCtx";         v1["211"]="AddrsOcc"
+    v1["212"]="NoMem";        v1["213"]="RelocFail";    v1["214"]="UnkExtHdr";     v1["215"]="SemErrTFT"
+    v1["216"]="SynErrTFT";    v1["217"]="SemErrPF";     v1["218"]="SynErrPF";      v1["219"]="UnkAPN"
+    v1["220"]="UnkPDP";       v1["221"]="NoTFTAct";     v1["222"]="APNNoSub";      v1["223"]="APNRestrInc"
+    v1["224"]="MBMSCap";      v1["225"]="InvCorrID";    v1["226"]="MBMSSuper";     v1["227"]="NoBSSHist"
+    v1["228"]="IPv4Only";     v1["229"]="IPv6Only";     v1["230"]="SingleAddr";    v1["231"]="Collision"
+    v1["232"]="APNCong";      v1["233"]="NoBearer";     v1["234"]="TgtRestr";      v1["235"]="UEPwrSave"
+    v1["236"]="RelocNAS"
+}
+
+{
+    # ssh -t gives us \r\n line endings; strip the \r so it does not
+    # contaminate the last tshark field (or scramble terminal output).
+    gsub(/\r/, "")
+
+    count = $1
+
+    rest_after_count = $0
+    sub(/^[ \t]*[0-9]+[ \t]+/, "", rest_after_count)
+
+    # Split tab-separated tshark fields:
+    # f[1]=frame.time ("HH:MM:S UTC"), f[2]=gtpv2.message_type,
+    # f[3]=gtp.message, f[4]=gtpv2.cause, f[5]=gtp.cause
+    nf = split(rest_after_count, f, "\t")
+    if (index(f[1], "UTC") == 0) next
+
+    ts = f[1]
+    sub(/ +UTC.*$/, "", ts)
+
+    msg_v2 = f[2]; msg_v1 = f[3]; cause_v2 = f[4]; cause_v1 = f[5]
+
+    if (msg_v2 == "33") {
+        key = "GTPv2 CSR(33)  " format_cause(cause_v2, "v2")
+    } else if (msg_v1 == "17") {
+        key = "GTPv1 CPDP(17) " format_cause(cause_v1, "v1")
+    } else {
+        next
+    }
+
+    if (ts != current_ts && current_ts != "") {
+        flush_period()
+    }
+    current_ts = ts
+
+    if (!(key in counts)) {
+        order[++n] = key
+    }
+    counts[key] += count
+}
+
+END {
+    if (current_ts != "") flush_period()
+}
+
+function format_cause(causes, tbl,    parts, np, i, code, name, out) {
+    np = split(causes, parts, ",")
+    out = ""
+    for (i = 1; i <= np; i++) {
+        code = parts[i]
+        if (tbl == "v2") name = v2[code]
+        else name = v1[code]
+        if (name == "") name = "Unknown"
+        if (i > 1) out = out ","
+        out = out name "(" code ")"
+    }
+    return out
+}
+
+function flush_period(    i, k, color, reset) {
+    reset = "\033[0m"
+    for (i = 1; i <= n; i++) {
+        k = order[i]
+        color = ""
+        if (index(k, "SFailure") > 0) {
+            color = "\033[1;31m"        # bold red: system failure
+        } else if (index(k, "AuthFail") > 0) {
+            color = "\033[1;38;5;208m"  # bold orange: (user) auth failure
+        }
+        if (color != "") {
+            printf "%s%5d %s %s%s\n", color, counts[k], current_ts, k, reset
+        } else {
+            printf "%5d %s %s\n", counts[k], current_ts, k
+        }
+        fflush()
+    }
+    delete counts
+    delete order
+    n = 0
+}
+'
