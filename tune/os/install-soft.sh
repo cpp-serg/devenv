@@ -3,7 +3,7 @@
 MY_DIR=$(cd $(dirname $0); pwd)
 INSTALL_DIR=$(cd ${MY_DIR}/../../install; pwd)
 echo ${INSTALL_DIR}
-SUDO=$([ $(id -u) -ne 0 ] && echo sudo)
+SUDO=$([ $(id -u) -ne 0 ] && echo sudo || true)
 
 ${SUDO} dnf install -y \
     util-linux-user \

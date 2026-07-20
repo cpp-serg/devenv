@@ -4,18 +4,13 @@
 branch=${1:-stable}
 dstDir=${2:-/opt/nvim}
 
-SUDO=$([ $(id -u) -ne 0 ] && echo sudo)
+source "$(dirname "$0")/_install_preambule.sh"
 
-function die() {
-    echo "$1" 1>&2
-    exit 1
-}
-
-currDir=$(basename $(pwd))
+currDir=$(basename "$(pwd)")
 if [ "$currDir" != "neovim" ]; then
-    git clone --depth 1 --branch ${branch}  https://github.com/neovim/neovim || die "Failed to clone neovim"
-    pushd neovim
-    delete=1
+    _workdir
+    git clone --depth 1 --branch "${branch}" https://github.com/neovim/neovim || die "Failed to clone neovim"
+    cd neovim || die "Failed to enter neovim directory"
 else
     echo "Already in neovim directory"
 fi
@@ -36,9 +31,4 @@ ${SUDO} update-alternatives --install /usr/local/bin/nvim nvim /opt/nvim/bin/nvi
 # ${SUDO} update-alternatives --install /usr/local/bin/vim vim /usr/local/bin/nvim 100
 # ${SUDO} update-alternatives --install /usr/local/bin/vi vi /usr/local/bin/nvim 100
 hash -r  # reload hash table so that new version of nvim is found
-
-if [[ $delete -eq 1 ]]; then
-    popd
-    rm -rf neovim
-fi
 

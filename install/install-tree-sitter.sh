@@ -1,25 +1,6 @@
 #!/bin/bash
+set -euo pipefail
 
-SUDO=$([ $(id -u) -ne 0 ] && echo sudo)
+command -v clang++ >/dev/null 2>&1 || { echo "No clang++ found, exiting" >&2; exit 1; }
 
-function die() {
-  echo "$1" 1>&2
-  exit 1
-}
-
-if !command -v clang++ >/dev/null 2>&1; then
-  echo "No clang++ found, exiting"
-  exit 1
-  # ${SUDO} dnf install -y clang-devel || die "Failed to install libclang"
-fi
-
-. "$HOME/.cargo/env"
-
-cargo install tree-sitter-cli || die "Failed to install tree-sitter-cli"
-
-[[ ! -d /opt/tools ]] && ${SUDO} mkdir /opt/tools
-[[ ! -x /opt/tools ]] && ${SUDO} chmod a+rx /opt/tools
-
-${SUDO} cp "$HOME/.cargo/bin/tree-sitter" /opt/tools/ && ${SUDO} chmod 755 /opt/tools/tree-sitter
-
-echo "tree-sitter $(tree-sitter --version) installed successfully"
+exec "$(dirname "$0")/_install_with_rust.sh" tree-sitter-cli tree-sitter

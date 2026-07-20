@@ -1,11 +1,5 @@
 #!/bin/bash
-
-SUDO=$([ $(id -u) -ne 0 ] && echo sudo)
-
-die() {
-  echo "$1" 1>&2
-  exit 1
-}
+source "$(dirname "$0")/_install_preambule.sh"
 
 # Install SCTP kernel module and development libraries
 if command -v dnf &>/dev/null; then
