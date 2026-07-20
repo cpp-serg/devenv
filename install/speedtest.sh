@@ -1,8 +1,7 @@
 #!/bin/bash
 
-# set ${SUDO} conditionally
-SUDO=$([ $(id -u) -ne 0 ] && echo sudo)
+source "$(dirname "$0")/_install_preambule.sh"
 
-curl -s https://packagecloud.io/install/repositories/ookla/speedtest-cli/script.rpm.sh | ${SUDO} bash
+curl -fsSL --retry 3 --retry-delay 2 https://packagecloud.io/install/repositories/ookla/speedtest-cli/script.rpm.sh | ${SUDO} bash
 ${SUDO} dnf install -y speedtest
 

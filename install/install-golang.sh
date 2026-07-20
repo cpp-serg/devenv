@@ -1,28 +1,21 @@
 #!/bin/bash
 
-set -euo pipefail
+source "$(dirname "$0")/_install_preambule.sh"
 
-SUDO=$([ $(id -u) -ne 0 ] && echo sudo)
-
-function die() {
-  echo "$1" 1>&2
-  exit 1
-}
-
-ARCH=$(uname -m)
-case "$ARCH" in
-  x86_64)  GOARCH="amd64" ;;
-  aarch64) GOARCH="arm64" ;;
-  *)       die "Unsupported architecture: $ARCH" ;;
+# translate the detected system architecture into Go's GOARCH naming
+case "$SYSTEM_ARCH" in
+  x86_64)  SYSTEM_GOARCH=amd64 ;;
+  aarch64) SYSTEM_GOARCH=arm64 ;;
+  *)       die "Unsupported architecture: $SYSTEM_ARCH" ;;
 esac
 
-LATEST=$(curl -fsSL "https://go.dev/dl/?mode=json" | jq -r '.[0].version')
+LATEST=$(curl -fsSL --retry 3 --retry-delay 2 "https://go.dev/dl/?mode=json" | jq -r '.[0].version')
 [[ -n "$LATEST" ]] && [[ "$LATEST" != "null" ]] || die "Failed to determine latest Go version"
 
-ARCHIVE="${LATEST}.linux-${GOARCH}.tar.gz"
+ARCHIVE="${LATEST}.linux-${SYSTEM_GOARCH}.tar.gz"
 
-echo "Installing ${LATEST} for linux/${GOARCH}..."
-curl -fsSL "https://go.dev/dl/${ARCHIVE}" -o /tmp/go.tar.gz || die "Failed to download Go"
+echo "Installing ${LATEST} for linux/${SYSTEM_GOARCH}..."
+curl -fsSL --retry 3 --retry-delay 2 "https://go.dev/dl/${ARCHIVE}" -o /tmp/go.tar.gz || die "Failed to download Go"
 
 ${SUDO} rm -rf /usr/local/go
 ${SUDO} tar -C /usr/local -xzf /tmp/go.tar.gz || die "Failed to extract Go"
