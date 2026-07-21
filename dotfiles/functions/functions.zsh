@@ -37,7 +37,7 @@ function _sp_ssh_show_diff {
     # Diff two paths (files or dirs) using difft, delta, or diff (in that order)
     local a=$1 b=$2
     if (( $+commands[difft] )); then
-        difft "$a" "$b"
+        difft --skip-unchanged "$a" "$b"
     elif (( $+commands[delta] )); then
         diff -ru "$a" "$b" | delta
     else
@@ -58,6 +58,11 @@ function _sp_ssh_maybe_install {
     if [[ ! -e $localpath ]]; then
         cp -a "$newpath" "$localpath"
         echo "  $name: installed (no local version existed)"
+        return
+    fi
+
+    if diff -rq "$localpath" "$newpath" >/dev/null 2>&1; then
+        echo "  $name: unchanged, skipping"
         return
     fi
 
