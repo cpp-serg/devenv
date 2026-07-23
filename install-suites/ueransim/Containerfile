@@ -1,0 +1,27 @@
+# Containerfile — Rocky Linux 8 build environment for UERANSIM.
+#
+# This image contains ONLY the toolchain. The UERANSIM source is cloned on the
+# host by build.sh and bind-mounted in at run time, so the clone, the build
+# tree, and the final bin/ all live on the host.
+#
+# Toolchain:
+#   - cmake / gcc-c++ / make : BaseOS/AppStream (cmake 3.20 >= required 3.17)
+#   - ninja-build            : EPEL, but pulls a dep from PowerTools, so that
+#                              repo must be enabled first
+#   - lksctp-tools-devel     : SCTP headers/lib (libsctp) required by the gNB
+
+FROM rockylinux:8
+
+RUN dnf -y install epel-release dnf-plugins-core \
+ && dnf config-manager --set-enabled powertools \
+ && dnf -y install \
+        git \
+        cmake \
+        ninja-build \
+        gcc \
+        gcc-c++ \
+        make \
+        lksctp-tools-devel \
+ && dnf clean all
+
+WORKDIR /work
