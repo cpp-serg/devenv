@@ -164,10 +164,10 @@ pkg_install() {
     [ "$DRY_RUN" = true ] && return 0
     if [ "$PKG" = apt-get ]; then
         DEBIAN_FRONTEND=noninteractive ${SUDO} apt-get update -qq || true
-        # shellcheck disable=SC2086  # deliberate: $* is a package list
+        # shellcheck disable=SC2048,SC2086  # deliberate: $* is a package list
         DEBIAN_FRONTEND=noninteractive ${SUDO} apt-get install -y --no-install-recommends $*
     else
-        # shellcheck disable=SC2086
+        # shellcheck disable=SC2048,SC2086  # deliberate: $* is a package list
         ${SUDO} ${PKG} install -y $*
     fi
 }

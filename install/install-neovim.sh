@@ -26,7 +26,7 @@ fi
 cmake -S cmake.deps -B .deps -G Ninja -D CMAKE_BUILD_TYPE=Release -DUSE_BUNDLED=ON || die "Failed to configure neovim dependencies"
 cmake --build .deps
 
-cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_EXPORT_COMPILE_COMMANDS=YES -DCMAKE_INSTALL_PREFIX=${dstDir} -DDEPS_PREFIX=$(pwd)/.deps/usr/ || die "Failed to configure neovim"
+cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_EXPORT_COMPILE_COMMANDS=YES -DCMAKE_INSTALL_PREFIX=${dstDir} -DDEPS_PREFIX="$(pwd)/.deps/usr/" || die "Failed to configure neovim"
 cmake --build build || die "Failed to build neovim"
 
 ${SUDO} rm -rf /opt/nvim || die "Failed to remove old neovim"

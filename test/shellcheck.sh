@@ -24,12 +24,28 @@ if ! command -v shellcheck >/dev/null 2>&1; then
     exit 127
 fi
 
+# Submodules are other people's code (and fzf-git.sh is zsh, which shellcheck
+# cannot parse). Paths are normalised to be repo-relative with no leading ./ so
+# one skip list works for both the git and the find branch.
+is_skipped() {
+    case "$1" in
+        bootstrap.sh) return 0 ;;                        # linted separately, as sh
+        dotfiles/fzf/* | dotfiles/fzf-git/* | dotfiles/zsh_custom/* | \
+            dotfiles/.config/tmux/plugins/*) return 0 ;;
+        # Self-contained build recipes for other projects (open5gs, sigscale,
+        # srsRAN, ueransim). Not on the bootstrap path; they carry their own
+        # pre-existing findings and are not part of this lint's contract.
+        install-suites/*) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
 mapfile -t files < <(
-    git ls-files '*.sh' 2>/dev/null \
-        || find . -name '*.sh' -not -path './dotfiles/fzf/*' -not -path './dotfiles/zsh_custom/*'
+    { git ls-files '*.sh' 2>/dev/null || find . -name '*.sh' -type f; } | sed 's|^\./||' | sort -u
 )
 
 rc=0
+checked=0
 
 # POSIX shell: the one file that must not use bash features.
 echo "== bootstrap.sh (as POSIX sh) =="
@@ -41,16 +57,15 @@ fi
 echo
 echo "== bash scripts =="
 for f in "${files[@]}"; do
-    case "$f" in
-        bootstrap.sh | dotfiles/fzf/* | dotfiles/zsh_custom/* | dotfiles/fzf-git/*) continue ;;
-    esac
+    is_skipped "$f" && continue
+    checked=$((checked + 1))
     shellcheck --shell=bash --severity="$SEVERITY" --external-sources "$f" || rc=1
     bash -n "$f" || rc=1
 done
 
 echo
 if [ "$rc" -eq 0 ]; then
-    echo "shellcheck: clean at severity=${SEVERITY}"
+    echo "shellcheck: ${checked} script(s) clean at severity=${SEVERITY}"
 else
     echo "shellcheck: findings above" >&2
 fi

@@ -28,7 +28,7 @@ workdir=$(mktemp -d)
 trap "rm -rf '$workdir'" EXIT
 cd "$workdir" || die "Failed to enter work directory $workdir"
 
-git clone https://github.com/the-tcpdump-group/libpcap.git && cd libpcap
+git clone https://github.com/the-tcpdump-group/libpcap.git && cd libpcap || die "Failed to clone libpcap"
 
 # The rpcap protocol has no set-datalink message, so remote clients are stuck
 # with whatever link type the server opens the device with. Default the "any"
@@ -49,7 +49,7 @@ git apply <<'EOF' || die "LINUX_SLL2 default patch did not apply"
  			pcapint_fmt_errmsg_for_errno(handle->errbuf,
 EOF
 
-mkdir release && cd release
+mkdir release && cd release || die "Failed to enter release dir"
 cmake -G Ninja -DBUILD_SHARED_LIBS=0 -DENABLE_REMOTE=1 -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/opt/libpcap ..
 ninja && ${SUDO} ninja install
 

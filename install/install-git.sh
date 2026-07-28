@@ -13,7 +13,7 @@ fi
 echo "Detected git version: $GIT_VER"
 _workdir
 curl -fOLJs --retry 3 --retry-delay 2 "https://mirrors.edge.kernel.org/pub/software/scm/git/git-$GIT_VER.tar.xz"
-tar xf "git-$GIT_VER.tar.xz" && cd "git-$GIT_VER"
+tar xf "git-$GIT_VER.tar.xz" && cd "git-$GIT_VER" || die "Failed to unpack git-$GIT_VER"
 make configure && ./configure --with-curl --without-tcltk --prefix=/opt/git && make -j
 ${SUDO} make install
 

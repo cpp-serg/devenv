@@ -21,6 +21,7 @@ _preambule_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 function _workdir() {
   local d
   d=$(mktemp -d)
+  # shellcheck disable=SC2064  # expand $d now: the trap must know this dir
   trap "rm -rf '$d'" EXIT
   cd "$d" || die "Failed to enter work directory $d"
 }

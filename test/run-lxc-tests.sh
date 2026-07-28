@@ -231,11 +231,17 @@ assert_common() {
     check "$id" "cmake >= 3.20" \
         'v=$(cmake --version | head -1 | sed -nE "s/.* ([0-9]+\.[0-9]+).*/\1/p"); [ "$(printf "%s\n3.20\n" "$v" | sort -V | head -1)" = "3.20" ]'
 
-    check "$id" "~/.zshrc symlinked into the repo" \
-        '[ "$(readlink -f ~/.zshrc)" = /root/devenv/dotfiles/.zshrc ]'
+    # The version floor: Rocky 8 packages tmux 2.7, so clearing 3.2 there proves
+    # the source-build fallback ran; Debian/Ubuntu clear it from the package.
+    check "$id" "tmux >= 3.2 (source build where the distro is too old)" \
+        'v=$(tmux -V | sed -nE "s/tmux ([0-9]+\.[0-9]+).*/\1/p")
+         [ "$(printf "%s\n3.2\n" "$v" | sort -V | head -1)" = "3.2" ] || { echo "tmux $v"; exit 1; }'
 
-    check "$id" "~/.config entries symlinked, not the whole directory" \
-        '[ ! -L ~/.config ] && [ "$(readlink -f ~/.config/nvim)" = /root/devenv/dotfiles/.config/nvim ]'
+    check "$id" "HOME/.zshrc symlinked into the repo" \
+        '[ "$(readlink -f "$HOME/.zshrc")" = /root/devenv/dotfiles/.zshrc ]'
+
+    check "$id" "HOME/.config entries symlinked, not the whole directory" \
+        '[ ! -L "$HOME/.config" ] && [ "$(readlink -f "$HOME/.config/nvim")" = /root/devenv/dotfiles/.config/nvim ]'
 
     check "$id" "oh-my-zsh installed with the repo custom dir" \
         '[ -d ~/.oh-my-zsh ] && [ -d /root/devenv/dotfiles/zsh_custom/plugins/zsh-autosuggestions ]'
@@ -271,7 +277,7 @@ assert_idempotent() {
     check "$id" "second run succeeds" \
         "/root/devenv/setup.sh --${mode} --yes --no-opt-tools >/tmp/rerun.log 2>&1 || { tail -20 /tmp/rerun.log; exit 1; }"
     check "$id" "second run created no new dotfile backups" \
-        'n=$(ls -d ~/.zshrc.bak.* 2>/dev/null | wc -l); [ "$n" -le 1 ]'
+        'n=$(ls -d "$HOME"/.zshrc.bak.* 2>/dev/null | wc -l); [ "$n" -le 1 ]'
 }
 
 # The rust helper plus _deploy_to_opt and the priority-100 alternative is the

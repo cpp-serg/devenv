@@ -31,6 +31,7 @@ if [ -r /etc/os-release ]; then
     _os_like=${ID_LIKE:-}
 fi
 
+# shellcheck disable=SC2034  # consumed by lib/pkg.sh and the profiles
 OS_MAJOR=${OS_VER%%.*}
 
 OS_FAMILY=unknown
@@ -74,9 +75,11 @@ SYSTEM_ARCH=$(uname -m)
 # original one-liner this refuses to hand back "sudo" when sudo is not actually
 # installed, so the failure is a clear message instead of "sudo: not found"
 # repeated for every package.
+# shellcheck disable=SC2034  # used by every sourcing script
 SUDO=""
 if [ "$(id -u)" -ne 0 ]; then
     if command -v sudo >/dev/null 2>&1; then
+        # shellcheck disable=SC2034  # used by every sourcing script
         SUDO=sudo
     else
         echo "ERROR: not running as root and sudo is not installed." >&2

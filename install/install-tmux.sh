@@ -5,7 +5,8 @@ source "$(dirname "$0")/_install_preambule.sh"
 pkg_install tmux-build-deps make
 
 _workdir
-git clone https://github.com/tmux/tmux.git --branch "${TMUX_VER}" --single-branch && cd tmux
+git clone https://github.com/tmux/tmux.git --branch "${TMUX_VER}" --single-branch && cd tmux \
+  || die "Failed to clone tmux ${TMUX_VER}"
 sh autogen.sh && ./configure --prefix=/opt/tmux && make -j
 ${SUDO} make install
 
