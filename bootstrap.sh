@@ -43,6 +43,8 @@ Options:
   --link-mode dir       symlink ~/.config as a whole (legacy behaviour)
   --build-git           build git from source instead of using the distro package
   --no-work-tweaks      skip the site-specific tweaks in dev mode
+  --no-opt-tools        skip the rust/go rebuild of the /opt/tools binaries
+                        (that step alone takes tens of minutes)
   -h, --help            this text
 
 Examples:
@@ -77,7 +79,7 @@ while [ $# -gt 0 ]; do
         --link-mode)
             [ $# -ge 2 ] || { echo "--link-mode needs entries|dir" >&2; exit 1; }
             add_forward "--link-mode"; add_forward "$2"; shift ;;
-        --build-git | --no-work-tweaks)
+        --build-git | --no-work-tweaks | --no-opt-tools)
             add_forward "$1" ;;
         -h | --help)
             usage; exit 0 ;;

@@ -15,6 +15,7 @@ MODE=""
 SP_LINK_MODE=entries
 SP_BUILD_GIT=false
 SP_WORK_TWEAKS=true
+SP_OPT_TOOLS=true
 : "${SP_INTERACTIVE:=false}"
 SP_ASSUME_YES=false
 SP_DRY_RUN=false
@@ -29,6 +30,7 @@ while [ $# -gt 0 ]; do
             SP_LINK_MODE=${2:?--link-mode needs entries|dir}; shift ;;
         --build-git) SP_BUILD_GIT=true ;;
         --no-work-tweaks) SP_WORK_TWEAKS=false ;;
+        --no-opt-tools) SP_OPT_TOOLS=false ;;
         -h | --help)
             sed -n '1,20p' "${SP_REPO_ROOT}/bootstrap.sh"; exit 0 ;;
         *) echo "setup.sh: unknown option $1" >&2; exit 1 ;;
@@ -41,7 +43,7 @@ case "$SP_LINK_MODE" in
     *) echo "setup.sh: --link-mode must be 'entries' or 'dir'" >&2; exit 1 ;;
 esac
 
-export SP_INTERACTIVE SP_ASSUME_YES SP_DRY_RUN SP_LINK_MODE SP_BUILD_GIT SP_WORK_TWEAKS
+export SP_INTERACTIVE SP_ASSUME_YES SP_DRY_RUN SP_LINK_MODE SP_BUILD_GIT SP_WORK_TWEAKS SP_OPT_TOOLS
 
 # Everything from here on is also written to a log file, so a long run can be
 # reviewed afterwards. Questions are printed on /dev/tty and stay interactive.

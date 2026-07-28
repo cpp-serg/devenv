@@ -101,8 +101,12 @@ ensure_tmux() {
 
 step_repos() { pkg_enable_repos; }
 
+# NB the explicit `|| return 1` below. run_step invokes these functions in an
+# `if`, which suspends `set -e` for the whole call, so an intermediate failure
+# would otherwise be skipped over and the step still counted as successful.
 step_core_pkgs() {
-    pkg_install zsh git git-lfs tig htop ncdu dos2unix tar unzip bzip2 findutils curl ca-certificates less
+    pkg_install zsh git git-lfs tig htop ncdu dos2unix tar unzip bzip2 findutils curl ca-certificates less \
+        || return 1
     # ripgrep keeps its name everywhere; fd-find installs /usr/bin/fdfind on
     # Debian, so pkg_install_tool registers `fd` through update-alternatives.
     pkg_install_tool ripgrep fd
@@ -118,8 +122,8 @@ step_git() {
 }
 
 step_toolchain() {
-    pkg_install toolchain gettext
-    ensure_cmake
+    pkg_install toolchain gettext || return 1
+    ensure_cmake || return 1
     pkg_install ninja
 }
 
@@ -164,8 +168,8 @@ step_gitconfig() {
 }
 
 step_neovim() {
-    pkg_install nvim-build-deps
-    ensure_cmake
+    pkg_install nvim-build-deps || return 1
+    ensure_cmake || return 1
     run_script "${SP_INSTALL_DIR}/install-neovim.sh"
 }
 
@@ -232,9 +236,12 @@ step_claude() {
 }
 
 step_chsh() {
-    local zsh_path
+    local zsh_path current
     zsh_path=$(command -v zsh) || { warn "zsh not found; cannot change the shell"; return 0; }
-    if [ "${SHELL:-}" = "$zsh_path" ]; then
+    # $SHELL still holds the old value inside the shell that ran chsh, so ask
+    # passwd instead - otherwise a re-run always thinks there is work to do.
+    current=$(getent passwd "$(id -un)" 2>/dev/null | cut -d: -f7)
+    if [ "$current" = "$zsh_path" ]; then
         step "login shell is already ${zsh_path}"
         return 0
     fi

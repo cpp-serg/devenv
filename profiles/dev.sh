@@ -23,7 +23,11 @@ profile_dev() {
     # Rust/Go built tools that land in /opt/tools (fd, rg, bat, delta, difft,
     # fzf, lazygit, peco, tree-sitter). They take priority 100 in
     # update-alternatives, above the distro packages installed above.
-    run_step "/opt/tools rebuild" step_opt_tools || true
+    if [ "${SP_OPT_TOOLS:-true}" = true ]; then
+        run_step "/opt/tools rebuild" step_opt_tools || true
+    else
+        skip_step "/opt/tools rebuild" "--no-opt-tools"
+    fi
 
     # Site-specific: the CIFS build share, sshd banner/forwarding, tmux lock.
     # Dev mode only, and skippable with --no-work-tweaks.

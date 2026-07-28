@@ -262,7 +262,12 @@ $HAVE_CLAUDE && compdef _gnu_generic claude
 if $HAVE_DELTA; then
     export DELTA_FEATURES=+side-by-side
     export GIT_PAGER='delta'
-    source <(delta --generate-completion zsh)
+    # --generate-completion only exists in newer deltas (Ubuntu 24.04 packages
+    # 0.16, which answers with a full clap usage dump on stderr). Ask quietly and
+    # go without completions when it is not supported.
+    _sp_delta_comp=$(delta --generate-completion zsh 2>/dev/null)
+    [[ -n ${_sp_delta_comp} ]] && source <(printf '%s\n' "${_sp_delta_comp}")
+    unset _sp_delta_comp
 else
     export GIT_PAGER='less -RS'
 fi

@@ -24,6 +24,7 @@ if [[ -d $DST_DIR ]]; then
   exit 0
 fi
 
+_workdir   # build in a temp dir so the installer is not left in $PWD
 curl -fsSL --retry 3 --retry-delay 2 "https://github.com/Kitware/CMake/releases/download/v$CMAKE_VER/cmake-$CMAKE_VER-linux-$SYSTEM_ARCH.sh" -o install_cmake.sh || die "Failed to download CMake installer"
 $SUDO mkdir -p "$DST_DIR" && $SUDO sh install_cmake.sh --skip-license --exclude-subdir --prefix="$DST_DIR"
 rm install_cmake.sh
