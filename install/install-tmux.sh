@@ -2,7 +2,7 @@
 TMUX_VER=3.6a
 source "$(dirname "$0")/_install_preambule.sh"
 
-${SUDO} dnf install -y automake libevent-devel byacc ncurses-devel
+pkg_install tmux-build-deps make
 
 _workdir
 git clone https://github.com/tmux/tmux.git --branch "${TMUX_VER}" --single-branch && cd tmux

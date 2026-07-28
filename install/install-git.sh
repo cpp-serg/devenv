@@ -1,7 +1,7 @@
 #!/bin/bash
 source "$(dirname "$0")/_install_preambule.sh"
 
-${SUDO} dnf install -y autoconf libcurl-devel openssl-devel expat-devel
+pkg_install git-build-deps make tar
 
 GIT_VER=$(curl -fs --retry 3 --retry-delay 2 "https://api.github.com/repos/git/git/tags?per_page=10" | grep -oP '"name":\s*"v\K[0-9]+\.[0-9]+\.[0-9]+(?=")' | head -1)
 

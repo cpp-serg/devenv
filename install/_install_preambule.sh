@@ -1,23 +1,19 @@
 #!/bin/bash
 # Common preamble for the install scripts. Meant to be *sourced*, not executed:
 #   source "$(dirname "${BASH_SOURCE[0]}")/_install_preambule.sh"
-# Provides: strict mode, ${SUDO}, ${SYSTEM_ARCH}, die(), _workdir(),
-# _deploy_to_opt().
+#
+# Provides strict mode plus everything from lib/: ${SUDO}, ${SYSTEM_ARCH},
+# ${OS_FAMILY}, die(), warn(), step(), pkg_install(), alt_register(), and the
+# local helpers _workdir() and _deploy_to_opt().
+#
+# Build dependencies are declared with canonical names and resolved per distro
+# by lib/pkgmap.sh, so no install script mentions dnf or apt directly.
 
 set -euo pipefail
 
-# sudo prefix when not already running as root, empty otherwise
-SUDO=$([ "$(id -u)" -ne 0 ] && echo sudo || true)
-
-# Architecture of the machine this script runs on (uname -m form: x86_64,
-# aarch64, ...), detected once at source time so callers can reference it
-# directly as ${SYSTEM_ARCH}.
-SYSTEM_ARCH=$(uname -m)
-
-function die() {
-  echo "$1" 1>&2
-  exit 1
-}
+_preambule_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+# shellcheck source=lib/pkg.sh
+. "${_preambule_dir}/../lib/pkg.sh"
 
 # cd into a fresh temporary directory that is removed automatically when the
 # script exits (on success or failure). Use this before cloning/building so
@@ -33,12 +29,18 @@ function _workdir() {
 # make it executable, then print a success line.
 #   _deploy_to_opt <source-binary-path> [target-name]
 # target-name defaults to the basename of the source path.
+#
+# The binary is also registered with update-alternatives at priority 100, above
+# the 50 the distro packages get, so a freshly built tool takes over the plain
+# name (fd, bat, ...) even where the distro ships a differently named one.
 function _deploy_to_opt() {
   local src="$1"
   local target="${2:-$(basename "$src")}"
 
   ${SUDO} install -d -m 755 /opt/tools
   ${SUDO} install -m 755 "$src" "/opt/tools/$target"
+
+  alt_register "$target" "/opt/tools/$target" 100
 
   local version
   version=$("/opt/tools/$target" --version 2>/dev/null | head -n1 || true)

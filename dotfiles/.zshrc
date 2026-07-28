@@ -93,6 +93,11 @@ HAVE_LAZYGIT=$(HaveTool lazygit)
 HAVE_PICKSSH=$(HaveTool pick-ssh)
 HAVE_LXD=$(HaveTool lxc)
 HAVE_CLAUDE=$(HaveTool claude)
+HAVE_NVIM=$(HaveTool nvim)
+
+# Distribution, used to pick the right oh-my-zsh package plugins below.
+SP_OS_ID=""
+[[ -r /etc/os-release ]] && SP_OS_ID=$( . /etc/os-release 2>/dev/null; echo ${ID:-} )
 
 [[ -f ~/.config/.pythonrc ]] && export PYTHONSTARTUP=~/.config/.pythonrc
 [[ -f ${HOME}/.cargo/env  ]] && source "${HOME}/.cargo/env"
@@ -171,7 +176,14 @@ HIST_STAMPS="yyyy-mm-dd"
 
 # Would you like to use another custom folder than $ZSH/custom?
 # ZSH_CUSTOM=/path/to/new-custom-folder
-plugins=(cp yum dnf pip)
+plugins=(cp pip)
+
+# Package manager plugin depends on the distribution, not on the dotfiles.
+case ${SP_OS_ID} in
+    ubuntu)                             plugins+=(ubuntu) ;;
+    debian|raspbian)                    plugins+=(debian) ;;
+    rocky|rhel|centos|almalinux|fedora) plugins+=(yum dnf) ;;
+esac
 
 $HAVE_GIT && plugins+=(git)
 $HAVE_GO && plugins+=(golang)
@@ -183,7 +195,9 @@ $HAVE_TMUX && plugins+=(tmux)
 
 ZSH_CUSTOM=${SP_DOTFILES_ROOT}/zsh_custom
 
-for custom_plug in $(ls ${ZSH_CUSTOM}/plugins); do
+# Submodules may not be checked out yet; (/N:t) yields nothing instead of an
+# error when the directory is missing or empty.
+for custom_plug in ${ZSH_CUSTOM}/plugins/*(/N:t); do
     plugins+=(${custom_plug})
 done
 
@@ -218,7 +232,15 @@ export ZSH_AUTOSUGGEST_STRATEGY=(history completion)
 
 export LANG=en_US.UTF-8
 
-export EDITOR='nvim'
+# nvim is the intended editor, but a host where the build failed (or has not run
+# yet) should still get a working EDITOR rather than a missing command.
+if $HAVE_NVIM; then
+    export EDITOR='nvim'
+elif (( $+commands[vim] )); then
+    export EDITOR='vim'
+else
+    export EDITOR='vi'
+fi
 CORRECT_IGNORE_FILE='release'
 
 if $HAVE_GIT; then
@@ -309,9 +331,13 @@ fi
 [[ -n "${PENTE_HOST_IP}" ]] && RPS1="${RPS1} - ${PENTE_HOST_IP}"
 [[ -n "${PENTE_HOST_TAG}" ]] && RPS1="${RPS1} - ${PENTE_HOST_TAG}"
 
-alias vim='nvim'
+if $HAVE_NVIM; then
+    alias vim='nvim'
+    alias vimd='nvim -d'
+elif (( $+commands[vim] )); then
+    alias vimd='vim -d'
+fi
 alias tma='tmux attach'
-alias vimd='nvim -d'
 alias ncdu="${SUDO} ncdu -x"
 alias df="${SUDO} df -h"
 alias du="${SUDO} du -h"

@@ -5,12 +5,18 @@ DST_DIR=/opt/cmake
 source "$(dirname "$0")/_install_preambule.sh"
 
 # if first argument is not empty, use it as the version
-# otherwise figure out latest version
+# otherwise ask GitHub for the latest release tag. This used to scrape
+# cmake.org's HTML with xmllint, which meant an extra dependency (libxml2 /
+# libxml2-utils) and a parser tied to the page layout.
 if [ -n "${1:-}" ]; then
   CMAKE_VER=$1
 else
-  CMAKE_VER=$(curl -Ls --retry 3 --retry-delay 2 https://cmake.org/download | xmllint  --html --nowarning --xpath '//*[@id="latest"]/text()' - 2>/dev/null | sed -rn "s/.*\((.+)\)/\1/p")
+  CMAKE_VER=$(curl -fsSL --retry 3 --retry-delay 2 \
+    "https://api.github.com/repos/Kitware/CMake/releases/latest" \
+    | grep -oP '"tag_name":\s*"v\K[0-9]+\.[0-9]+\.[0-9]+(?=")' | head -1)
 fi
+
+[ -n "$CMAKE_VER" ] || die "Failed to detect the latest CMake version"
 
 echo "Installing CMake version $CMAKE_VER"
 if [[ -d $DST_DIR ]]; then
@@ -19,7 +25,7 @@ if [[ -d $DST_DIR ]]; then
 fi
 
 curl -fsSL --retry 3 --retry-delay 2 "https://github.com/Kitware/CMake/releases/download/v$CMAKE_VER/cmake-$CMAKE_VER-linux-$SYSTEM_ARCH.sh" -o install_cmake.sh || die "Failed to download CMake installer"
-$SUDO mkdir /opt/cmake && $SUDO sh install_cmake.sh --skip-license --exclude-subdir --prefix="$DST_DIR"
+$SUDO mkdir -p "$DST_DIR" && $SUDO sh install_cmake.sh --skip-license --exclude-subdir --prefix="$DST_DIR"
 rm install_cmake.sh
 
 $SUDO update-alternatives --install /usr/local/bin/cmake cmake /opt/cmake/bin/cmake 100

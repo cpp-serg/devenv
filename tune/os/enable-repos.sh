@@ -1,18 +1,17 @@
 #!/bin/bash
+# Enable the repositories the rest of the setup needs:
+#   EL      EPEL plus CodeReady Builder (called powertools on EL8)
+#   Ubuntu  the universe component, if ripgrep/fd-find are not reachable
+#   Debian  nothing beyond an index refresh
+#   Proxmox nothing at all - a PVE host's apt sources are left alone
+#
+# The logic itself lives in pkg_enable_repos (lib/pkg.sh) so setup.sh and this
+# standalone entry point cannot drift apart.
 
-function die {
-    echo "ERROR: $*" 1>&2
-    exit 1
-}
+set -euo pipefail
 
-# set ${SUDO} conditionally
-SUDO=$(test $(id -u) -ne 0 && echo sudo)
+MY_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+# shellcheck source=lib/pkg.sh
+. "${MY_DIR}/../../lib/pkg.sh"
 
-dnf install -y --enablerepo="baseos" dnf-plugins-core 
-
-${SUDO} dnf install -y --enablerepo="devel" --enablerepo="extras" epel-release \
-    && /usr/bin/crb enable \
-    || die "Failed to isntall/enable EPEL"
-
-${SUDO} dnf config-manager --set-enabled "baseos*" "appstream*" "extras" "devel" "epel*" \
-    || die "Failed to enable repos"
+pkg_enable_repos

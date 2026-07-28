@@ -6,6 +6,11 @@ dstDir=${2:-/opt/nvim}
 
 source "$(dirname "$0")/_install_preambule.sh"
 
+# Neovim is always built from source, on every distribution, so the build
+# dependencies are installed here rather than being assumed to be present.
+pkg_install nvim-build-deps
+command -v cmake >/dev/null 2>&1 || die "cmake not found; run install-cmake.sh first"
+
 currDir=$(basename "$(pwd)")
 if [ "$currDir" != "neovim" ]; then
     _workdir

@@ -9,8 +9,10 @@ case "$SYSTEM_ARCH" in
   *)       die "Unsupported architecture: $SYSTEM_ARCH" ;;
 esac
 
-LATEST=$(curl -fsSL --retry 3 --retry-delay 2 "https://go.dev/dl/?mode=json" | jq -r '.[0].version')
-[[ -n "$LATEST" ]] && [[ "$LATEST" != "null" ]] || die "Failed to determine latest Go version"
+# go.dev/VERSION returns the current release as plain text ("go1.24.5"), which
+# avoids depending on jq just to read one field out of the JSON index.
+LATEST=$(curl -fsSL --retry 3 --retry-delay 2 "https://go.dev/VERSION?m=text" | head -n1)
+[[ "$LATEST" == go* ]] || die "Failed to determine latest Go version"
 
 ARCHIVE="${LATEST}.linux-${SYSTEM_GOARCH}.tar.gz"
 

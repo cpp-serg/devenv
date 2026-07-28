@@ -1,6 +1,8 @@
 #!/bin/bash
 source "$(dirname "$0")/_install_preambule.sh"
 
+pkg_install toolchain autoconf automake libtool
+
 _workdir
 git clone https://github.com/ianlancetaylor/libbacktrace.git || die "Failed to clone libbacktrace"
 cd libbacktrace || die "Failed to cd into libbacktrace"
