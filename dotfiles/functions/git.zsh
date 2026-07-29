@@ -2,7 +2,7 @@ GIT_JPU_GGSN_PATH=git@bitbucket.org:jpugit/ggsn.git
 GIT_JPU_AMF_PATH=git@bitbucket.org:jpugit/pente-amfd.git
 GIT_JPU_CFG_MANAGER_PATH=git@bitbucket.org:jpugit/cfg-manager.git
 GIT_JPU_CICD_PATH=git@bitbucket.org:jpugit/cicd.git
-GIT_JPU_HSS_PATH=git@bitbucket.org:jpugit/hss.git
+GIT_JPU_HSS_PATH=git@bitbucket.org:jpugit/pente-hss.git
 GIT_JPU_MME_PATH=git@bitbucket.org:jpugit/open5gs.git
 GIT_JPU_TESTS_PATH=git@bitbucket.org:jpugit/jpu-tests.git
 
@@ -110,5 +110,7 @@ alias gd='sp-git-diff'
 alias gdt='sp-git-difft'
 alias gsh='sp-git-show'
 alias gsht='sp-git-showt'
+alias gdu='gd @{u}'
+alias gdut='gdt @{u}'
 
 alias gdth='git difft HEAD'
