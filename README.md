@@ -89,6 +89,25 @@ Two details worth knowing:
   is not — which is why Rocky 8, with tmux 2.7, still compiles tmux while Debian
   13 does not. Neovim is the exception: always built from source.
 
+### Completion cache
+
+`fzf`, `delta`, `lxc` and `pick-ssh` generate their zsh completions by running the
+tool itself, which forked a process on every single shell start. Those are now
+cached under `${XDG_CACHE_HOME:-~/.cache}/devenv/completions/`, which cut
+interactive startup from 67 ms to 57 ms (measured over 20 startups in a Debian 13
+container with fzf and delta present; the saving grows with each extra generator).
+
+The cache key is the resolved binary's path, mtime and size, stored as the first
+line of the cache file. A cache hit costs one `zstat` and one `read` — both zsh
+builtins, no fork. The entry is invalidated when the tool is upgraded (new mtime
+and size), when PATH resolves the name to a different file, or when
+`update-alternatives` switches which binary the name points at. Reinstalling the
+*same* version keeps the entry, because dpkg restores the archive's mtime and
+size — which is correct, since identical versions produce identical completions.
+
+Run `sp_completion_cache_clear` to drop it by hand; a corrupt, empty or truncated
+entry is treated as a miss and regenerated silently.
+
 On a **Proxmox VE host** the apt sources, sshd config, kernel modules and CIFS
 mounts are all left alone, and dev mode warns that it is about to put a
 toolchain on a hypervisor.

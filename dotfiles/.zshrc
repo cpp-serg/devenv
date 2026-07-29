@@ -19,6 +19,16 @@ IS_SP_PRIVATE_HOST=$(HaveFile ${HOME}/.sp-private-host)
 export PATH="$PATH:$HOME/devenv/scripts"
 [[ -d "${HOME}/.local/bin" ]] && export PATH="$HOME/.local/bin:$PATH"
 
+# update-alternatives puts our canonical tool names (fd, bat, delta, nvim, tmux)
+# in /usr/local/bin. Some login paths leave it out entirely - `pct exec`, cron,
+# minimal sshd setups - which hides those tools, so put it back, ahead of
+# /usr/bin so the alternative wins over any same-named distro binary.
+for _sp_local_dir in /usr/local/sbin /usr/local/bin; do
+    [[ -d ${_sp_local_dir} ]] && path=(${_sp_local_dir} ${path:#${_sp_local_dir}})
+done
+unset _sp_local_dir
+export PATH
+
 # If I'm running as a different user, still bring tools from master user (if accessible)
 if [[ ("${USER}" != "${SP_MASTER_USER}") && (-x "/home/${SP_MASTER_USER}") ]]; then
     for p in .local/bin .local/devenv/scripts; do
@@ -98,6 +108,82 @@ HAVE_NVIM=$(HaveTool nvim)
 # Distribution, used to pick the right oh-my-zsh package plugins below.
 SP_OS_ID=""
 [[ -r /etc/os-release ]] && SP_OS_ID=$( . /etc/os-release 2>/dev/null; echo ${ID:-} )
+
+# ---------------------------------------------------------------------------
+# Completion cache
+# ---------------------------------------------------------------------------
+# fzf, delta, lxc and pick-ssh all generate their zsh completions by running the
+# tool itself (`source <(fzf --zsh)`), which forks a process on *every* shell
+# start. Cache the generated script and re-run the generator only when the tool's
+# binary changes.
+#
+# The cache key - the binary's resolved path, mtime and size - is stored as the
+# first line of the cache file, so a cache hit costs one zstat and one `read`,
+# both builtins. Upgrading a tool, or switching which binary `fd`/`bat` point at
+# via update-alternatives, changes mtime/size and invalidates the entry.
+SP_COMPLETION_CACHE="${XDG_CACHE_HOME:-${HOME}/.cache}/devenv/completions"
+
+zmodload -F zsh/stat b:zstat 2>/dev/null
+SP_HAVE_ZSTAT=$(( $+builtins[zstat] ))
+
+# sp_completion_cache <cache-name> <tool> [generator args...]
+# On success sets $REPLY to a sourceable file and returns 0. Sourcing is left to
+# the caller so the completion script runs with the shell's own options rather
+# than this function's.
+function sp_completion_cache {
+    emulate -L zsh
+
+    local name=$1 tool=$2
+    shift 2
+
+    local bin=${commands[$tool]}
+    [[ -n $bin ]] || return 1
+
+    (( SP_HAVE_ZSTAT )) || { REPLY=""; return 2; }   # caller falls back
+
+    # zstat's +element form takes exactly one element, so use the hash form and
+    # read both fields from it. Symlinks are followed, which is what makes an
+    # update-alternatives switch invalidate the entry.
+    local -A st
+    zstat -H st -- $bin 2>/dev/null || return 1
+    local key="# devenv-completion-cache ${bin} ${st[mtime]} ${st[size]}"
+    local file="${SP_COMPLETION_CACHE}/${name}.zsh"
+
+    # Cache hit: first line still matches the binary we would run.
+    local first=""
+    [[ -s $file ]] && read -r first < $file
+    if [[ $first == $key ]]; then
+        REPLY=$file
+        return 0
+    fi
+
+    [[ -d $SP_COMPLETION_CACHE ]] || mkdir -p -- $SP_COMPLETION_CACHE || return 1
+
+    # Regenerate. A tool that does not understand the flag (Ubuntu 24.04 packages
+    # delta 0.16, which has no --generate-completion) fails here and is simply
+    # left without completions.
+    local tmp="${file}.new.$$"
+    if ! { print -r -- $key; $bin "$@" } >| $tmp 2>/dev/null; then
+        rm -f -- $tmp
+        return 1
+    fi
+    # Anything at or below the key line alone means the generator produced nothing.
+    zstat -H st -- $tmp 2>/dev/null || { rm -f -- $tmp; return 1; }
+    if (( st[size] <= ${#key} + 1 )); then
+        rm -f -- $tmp
+        return 1
+    fi
+
+    mv -f -- $tmp $file || { rm -f -- $tmp; return 1; }
+    REPLY=$file
+    return 0
+}
+
+# Drop the cache; the next shell regenerates it.
+function sp_completion_cache_clear {
+    rm -rf -- $SP_COMPLETION_CACHE
+    print -r -- "cleared ${SP_COMPLETION_CACHE}"
+}
 
 [[ -f ~/.config/.pythonrc ]] && export PYTHONSTARTUP=~/.config/.pythonrc
 [[ -f ${HOME}/.cargo/env  ]] && source "${HOME}/.cargo/env"
@@ -213,7 +299,12 @@ if $HAVE_FZF; then
     export FZF_DEFAULT_OPTS='--height=~90% --ansi --preview "bat --color=always --line-range :500 {}" --preview-window=right:wrap'
     #export FZF_DEFAULT_OPTS='--ansi --preview "bat --color=always --style=header,grid --line-range :500 {}" --preview-window=down:3:wrap'
     #export FZF_DEFAULT_OPTS='--height 40% --layout=reverse --border --ansi --preview "bat --color=always --style=header,grid --line-range :500 {}" --preview-window=down:3:wrap'
-    source <(fzf --zsh) # integrate fzf into zsh
+    # integrate fzf into zsh, from cache when the binary has not changed
+    if sp_completion_cache fzf fzf --zsh; then
+        source $REPLY
+    else
+        [[ $? -eq 2 ]] && source <(fzf --zsh)   # no zstat: generate every time
+    fi
     __fzf_git_fzf='function _fzf_git_fzf() {
         fzf --height 70% --tmux 95%,95% \
           --layout reverse --multi --min-height 20+ --border \
@@ -226,7 +317,13 @@ if $HAVE_FZF; then
    source ${SP_DOTFILES_ROOT}/fzf-git/fzf-git.sh
 fi
 
-$HAVE_LXD && source <(lxc completion zsh)
+if $HAVE_LXD; then
+    if sp_completion_cache lxc lxc completion zsh; then
+        source $REPLY
+    else
+        [[ $? -eq 2 ]] && source <(lxc completion zsh)
+    fi
+fi
 
 export ZSH_AUTOSUGGEST_STRATEGY=(history completion)
 
@@ -263,17 +360,23 @@ if $HAVE_DELTA; then
     export DELTA_FEATURES=+side-by-side
     export GIT_PAGER='delta'
     # --generate-completion only exists in newer deltas (Ubuntu 24.04 packages
-    # 0.16, which answers with a full clap usage dump on stderr). Ask quietly and
-    # go without completions when it is not supported.
-    _sp_delta_comp=$(delta --generate-completion zsh 2>/dev/null)
-    [[ -n ${_sp_delta_comp} ]] && source <(printf '%s\n' "${_sp_delta_comp}")
-    unset _sp_delta_comp
+    # 0.16, which answers with a full clap usage dump on stderr). The cache helper
+    # discards a failed generator, so an old delta just gets no completions.
+    if sp_completion_cache delta delta --generate-completion zsh; then
+        source $REPLY
+    else
+        [[ $? -eq 2 ]] && source <(delta --generate-completion zsh 2>/dev/null)
+    fi
 else
     export GIT_PAGER='less -RS'
 fi
 
 if $HAVE_PICKSSH; then
-    source <(pick-ssh --embed zsh)
+    if sp_completion_cache pick-ssh pick-ssh --embed zsh; then
+        source $REPLY
+    else
+        [[ $? -eq 2 ]] && source <(pick-ssh --embed zsh)
+    fi
     export PICK_SSH_CONFIG="theme=catppuccin-mocha"
 fi
 
