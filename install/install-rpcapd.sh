@@ -1,9 +1,33 @@
 #!/bin/bash
+# Build libpcap from source (with remote capture support) and run rpcapd as a
+# systemd service. Self-sufficient: no other devenv scripts need to run first,
+# so it can be copied to a bare appliance host (e.g. Rocky 8 HyperCore edge
+# nodes) and executed as-is.
 
-source "$(dirname "$0")/_install_preambule.sh"
+set -euo pipefail
 
-${SUDO} dnf install -y ninja-build cmake flex
-_workdir
+# sudo prefix when not already running as root, empty otherwise
+SUDO=$([ "$(id -u)" -ne 0 ] && echo sudo || true)
+
+function die() {
+  echo "$1" 1>&2
+  exit 1
+}
+
+# Appliance hosts (HyperCore) ship with every stock Rocky repo disabled, so
+# enable the ones providing the build toolchain explicitly for this single
+# transaction instead of relying on the host's repo configuration.
+${SUDO} dnf install -y \
+  --enablerepo baseos --enablerepo appstream \
+  --enablerepo powertools --enablerepo devel \
+  git gcc make ninja-build cmake flex bison
+
+# Build in a fresh temporary directory that is removed automatically when the
+# script exits (on success or failure), so re-runs stay clean.
+workdir=$(mktemp -d)
+trap "rm -rf '$workdir'" EXIT
+cd "$workdir" || die "Failed to enter work directory $workdir"
+
 git clone https://github.com/the-tcpdump-group/libpcap.git && cd libpcap
 
 # The rpcap protocol has no set-datalink message, so remote clients are stuck
@@ -43,4 +67,3 @@ EOF
 
 ${SUDO} systemctl daemon-reload
 ${SUDO} systemctl enable --now rpcapd
-
