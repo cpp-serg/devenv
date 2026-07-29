@@ -165,9 +165,24 @@ return {
                 -- Some languages (like typescript) have entire language plugins that can be useful:
                 --    https://github.com/pmizio/typescript-tools.nvim
                 --
-                -- But for many setups, the LSP (`tsserver`) will work just fine
-                -- tsserver = {},
-                --
+                -- But for many setups, the LSP (`ts_ls`) will work just fine
+                ts_ls = {
+                    settings = {
+                        typescript = {
+                            inlayHints = {
+                                includeInlayParameterNameHints = 'literals',
+                                includeInlayFunctionLikeReturnTypeHints = true,
+                            },
+                        },
+                        javascript = {
+                            inlayHints = {
+                                includeInlayParameterNameHints = 'literals',
+                            },
+                        },
+                    },
+                },
+                -- Schema-aware completion for package.json / tsconfig.json
+                jsonls = {},
 
                 lua_ls = {
                     -- cmd = {...},
@@ -237,23 +252,27 @@ return {
                 ensure_installed = ensure_installed,
             })
 
-            require('mason-lspconfig').setup({
-                handlers = {
-                    function(server_name)
-                        local server = servers[server_name] or {}
-                        -- This handles overriding only values explicitly passed
-                        -- by the server configuration above. Useful when disabling
-                        -- certain features of an LSP (for example, turning off formatting for tsserver)
-                        server.capabilities = vim.tbl_deep_extend(
-                            'force',
-                            {},
-                            capabilities,
-                            server.capabilities or {}
-                        )
-                        require('lspconfig')[server_name].setup(server)
-                    end,
-                },
-            })
+            -- mason-lspconfig v2 removed the `handlers` option: it now just runs
+            -- vim.lsp.enable() for every Mason-installed server. Per-server
+            -- overrides therefore go through the native vim.lsp.config() API
+            -- (merged on top of the defaults nvim-lspconfig ships in lsp/*.lua).
+            for name, cfg in pairs(servers) do
+                local mason_managed = cfg.mason ~= false
+                cfg.mason = nil
+                cfg.capabilities = vim.tbl_deep_extend(
+                    'force',
+                    {},
+                    capabilities,
+                    cfg.capabilities or {}
+                )
+                vim.lsp.config(name, cfg)
+                if not mason_managed then
+                    -- Not installed via Mason, so automatic_enable won't see it.
+                    vim.lsp.enable(name)
+                end
+            end
+
+            require('mason-lspconfig').setup({})
         end,
     },
 }
