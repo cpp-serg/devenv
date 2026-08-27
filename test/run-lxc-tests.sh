@@ -22,7 +22,13 @@ set -uo pipefail
 MY_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REPO_ROOT=$(cd "${MY_DIR}/.." && pwd)
 
-STORAGE=${STORAGE:-local-lvm}
+# Storage for the container rootfs. Auto-detected because it differs per host
+# (local-lvm on a stock install, a ZFS pool elsewhere); override with STORAGE=.
+if [ -z "${STORAGE:-}" ]; then
+    STORAGE=$(pvesm status --content rootdir 2>/dev/null \
+        | awk 'NR>1 && $3=="active" {print $1}' | head -1)
+    [ -n "$STORAGE" ] || { echo "no active storage accepts container rootfs" >&2; exit 1; }
+fi
 BRIDGE=${BRIDGE:-vmbr0}
 TEMPLATE_DIR=/var/lib/vz/template/cache
 CORES=4

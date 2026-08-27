@@ -210,7 +210,7 @@ else
             git -C "$TARGET_ROOT" fetch --tags origin || warn "fetch failed; using the checkout as-is"
             [ -n "$BRANCH" ] && git -C "$TARGET_ROOT" checkout "$BRANCH"
             git -C "$TARGET_ROOT" pull --ff-only || warn "pull failed; using the checkout as-is"
-            git -C "$TARGET_ROOT" submodule update --init --recursive -j10 || warn "submodule update failed"
+            git -C "$TARGET_ROOT" submodule update --init --recursive -j 10 || warn "submodule update failed"
         fi
     else
         say "cloning ${REPO_URL} -> ${TARGET_ROOT}"
@@ -222,6 +222,11 @@ else
             fi
         fi
     fi
+fi
+
+# Fetch stays on HTTPS so any host can pull; push goes over SSH.
+if [ "$DRY_RUN" != true ] && [ -d "${TARGET_ROOT}/.git" ]; then
+    git -C "$TARGET_ROOT" remote set-url --push origin git@github.com:cpp-serg/devenv.git
 fi
 
 if [ "$DRY_RUN" = true ] && [ ! -f "${TARGET_ROOT}/setup.sh" ]; then

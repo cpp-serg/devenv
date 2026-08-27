@@ -149,7 +149,7 @@ step_submodules() {
     fi
     step "updating git submodules"
     [ "$SP_DRY_RUN" = true ] && return 0
-    git -C "$SP_REPO_ROOT" submodule update --init --recursive -j10
+    git -C "$SP_REPO_ROOT" submodule update --init --recursive -j 10
 }
 
 step_links() {
