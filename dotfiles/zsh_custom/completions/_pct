@@ -1,0 +1,138 @@
+#compdef pct
+#
+# Completion for Proxmox's pct(1).
+#
+# Replaces the one shipped by pve-container (/usr/share/zsh/vendor-completions/_pct),
+# which just dumps `pct bashcomplete` output through a bare compadd. This one keeps
+# pct as the source of truth for *which* candidates are valid in a given position
+# (pct already knows that `start` wants stopped CTs and `enter` wants running ones),
+# but decorates candidates that are container IDs with the container's name and
+# status. Only the ID is inserted.
+#
+# It also fixes two things the vendor version gets wrong:
+#   - COMP_LINE/COMP_POINT are built from the words up to the cursor rather than
+#     from the whole word array, so completing in the middle of a line works.
+#   - falls back to file completion when pct offers nothing, matching the
+#     `complete -o default` that the bash version uses (`pct push CTID <file>`).
+
+# Cache of "vmid<TAB>status<TAB>name" lines. `pct list` costs ~0.4s, and a single
+# TAB can call us repeatedly, so keep it for a few seconds.
+typeset -ga _pct_ct_cache
+typeset -g  _pct_ct_cache_at=0
+
+_pct_ct_list() {
+    local ttl
+    zstyle -s ":completion:${curcontext}:" pct-cache-ttl ttl || ttl=10
+
+    zmodload -F zsh/datetime p:EPOCHSECONDS 2>/dev/null
+    if (( ${#_pct_ct_cache} && EPOCHSECONDS - _pct_ct_cache_at < ttl )); then
+        return 0
+    fi
+
+    # Parse by header column offsets: the Lock column is usually blank, so
+    # splitting on whitespace shifts Name into Lock's field.
+    _pct_ct_cache=( ${(f)"$(pct list 2>/dev/null | awk '
+        NR == 1 { s = index($0, "Status"); l = index($0, "Lock"); n = index($0, "Name"); next }
+        s == 0 { next }
+        {
+            vmid = substr($0, 1, s - 1)
+            st   = substr($0, s, l - s)
+            nm   = substr($0, n)
+            gsub(/^[ \t]+|[ \t]+$/, "", vmid)
+            gsub(/^[ \t]+|[ \t]+$/, "", st)
+            gsub(/^[ \t]+|[ \t]+$/, "", nm)
+            if (vmid != "") print vmid "\t" st "\t" nm
+        }')"} )
+    _pct_ct_cache_at=$EPOCHSECONDS
+}
+
+_pct() {
+    local curcontext="$curcontext" cmd line point curr prev
+    local -a raw ids others disp
+
+    cmd=${words[1]}
+
+    # Rebuild the command line as seen up to the cursor. pct's bashcomplete
+    # handler ignores COMP_CWORD and re-parses substr(COMP_LINE, 0, COMP_POINT).
+    line="${(j: :)words[1,CURRENT-1]}"
+    [[ -n $line ]] && line+=' '
+    line+="$PREFIX"
+    point=${#line}
+    curr="$PREFIX"
+    prev="${words[CURRENT-1]}"
+
+    raw=( ${(f)"$(COMP_CWORD="$CURRENT" COMP_LINE="$line" COMP_POINT="$point" \
+        $cmd bashcomplete "$cmd" "$curr" "$prev" 2>/dev/null)"} )
+
+    if (( ! ${#raw} )); then
+        _default
+        return
+    fi
+
+    # Split candidates into known container IDs and everything else
+    # (subcommands, --options, snapshot names, a suggested free ID for
+    # `pct clone`, ...). Only the former get decorated.
+    local -A ct_status ct_name
+    local l vmid st nm
+    _pct_ct_list
+    for l in $_pct_ct_cache; do
+        vmid=${l%%$'\t'*}
+        st=${${l#*$'\t'}%%$'\t'*}
+        nm=${l##*$'\t'}
+        ct_status[$vmid]=$st
+        ct_name[$vmid]=$nm
+    done
+
+    local id
+    for id in $raw; do
+        if [[ -n ${ct_status[$id]} ]]; then
+            ids+=( $id )
+        else
+            others+=( $id )
+        fi
+    done
+
+    local ret=1
+
+    if (( ${#ids} )); then
+        # Pad so the listing lines up whether zsh shows one or many per row.
+        integer wi=0 wn=0
+        for id in $ids; do
+            (( ${#id} > wi ))            && wi=${#id}
+            (( ${#ct_name[$id]} > wn ))  && wn=${#ct_name[$id]}
+        done
+
+        # zsh fits as many columns as the terminal allows and there is no style
+        # to cap that, so force one row per container by padding each display
+        # string past half the screen width. Opt out with
+        #   zstyle ':completion:*:pct-containers' single-column false
+        integer pad=0
+        if zstyle -T ":completion:${curcontext}:pct-containers" single-column; then
+            (( COLUMNS > 24 )) && pad=COLUMNS-2
+        fi
+
+        local row
+        for id in $ids; do
+            row="${(r:wi:)id}  ${(r:wn:)ct_name[$id]}  ${ct_status[$id]}"
+            (( pad > ${#row} )) && row="${(r:pad:)row}"
+            disp+=( "$row" )
+        done
+        _description pct-containers expl 'container'
+        compadd "${expl[@]}" -d disp -a ids && ret=0
+    fi
+
+    if (( ${#others} )); then
+        local tag=pct-values lbl='value'
+        if (( CURRENT == 2 )); then
+            tag=pct-commands lbl='pct command'
+        elif [[ ${others[1]} == --* ]]; then
+            tag=pct-options lbl='option'
+        fi
+        _description $tag expl "$lbl"
+        compadd "${expl[@]}" -a others && ret=0
+    fi
+
+    return ret
+}
+
+_pct "$@"
