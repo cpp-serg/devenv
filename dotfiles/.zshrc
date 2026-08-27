@@ -452,6 +452,8 @@ alias du="${SUDO} du -h"
 alias reboot="${SUDO} reboot"
 alias cld=$'su -l - claude-runner -c "zsh -ic \'cd $(pwd) && exec claude --allow-dangerously-skip-permissions\'"'
 alias cldp='su - claude-runner'
+# Debian/Ubuntu ship `fd` as `fdfind` to avoid a name clash; alias it back if needed.
+(( ! ${+commands[fd]} )) && (( ${+commands[fdfind]} )) && alias fd='fdfind'
 
 # Remove duplicates from path
 typeset -U path PATH
