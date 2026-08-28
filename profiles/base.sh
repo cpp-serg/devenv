@@ -16,9 +16,11 @@ profile_base() {
 
     run_step "core packages" step_core_pkgs || true
     run_step "git" step_git || true
-    run_step "oh-my-zsh" step_ohmyzsh
+    # As everywhere else here: record the failure in the summary and keep going.
+    # setup.sh still exits non-zero at the end if anything failed.
+    run_step "oh-my-zsh" step_ohmyzsh || true
     run_step "git submodules" step_submodules || true
-    run_step "dotfile symlinks" step_links
+    run_step "dotfile symlinks" step_links || true
     run_step "git config" step_gitconfig || true
 
     # Neovim is always built from source, on every distro, which is what makes

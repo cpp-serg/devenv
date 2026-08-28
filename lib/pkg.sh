@@ -172,9 +172,54 @@ pkg_install_tool() {
 }
 
 # ---------------------------------------------------------------------------
-# Repository enablement (EPEL/CRB on EL, universe on Ubuntu). Needed by the
-# base profile, not just dev mode: ripgrep and fd-find live in EPEL on EL8.
+# Repository enablement (core repos + EPEL/CRB on EL, universe on Ubuntu).
+# Needed by the base profile, not just dev mode: ripgrep and fd-find live in
+# EPEL on EL8.
 # ---------------------------------------------------------------------------
+
+# The repos every EL box is assumed to have on. Appliance and vendor images do
+# not always oblige: a Scale HyperCore node, for instance, ships Rocky 8 with
+# baseos/appstream/extras set to enabled=0 and only a file:// CD repo turned on.
+# Nothing then reports as installable - zsh, gcc-c++, gdb and python3 all end up
+# in "not available in this distro's repos" - so this has to be checked before
+# EPEL, which itself lives in extras.
+_EL_CORE_REPOS="baseos appstream extras"
+
+# _pkg_el_set_enabled <repo-id> : dnf grew `config-manager` as a subcommand,
+# EL7's yum only has the standalone yum-config-manager.
+_pkg_el_set_enabled() {
+    if [ "$PKG_MGR" = yum ] && have yum-config-manager; then
+        ${SUDO} yum-config-manager --enable "$1" >/dev/null
+    else
+        ${SUDO} "$PKG_MGR" config-manager --set-enabled "$1" >/dev/null
+    fi
+}
+
+# _pkg_el_repo_status <repo-id> : enabled | disabled | absent.
+# Only repos already defined on the host are ever touched; a missing one is left
+# alone rather than invented.
+_pkg_el_repo_status() {
+    ${PKG_MGR} repolist --all -q 2>/dev/null | awk -v id="$1" '
+        $1 == id { print ($NF == "disabled" ? "disabled" : "enabled"); found = 1; exit }
+        END { if (!found) print "absent" }'
+}
+
+# _pkg_enable_core_repos_el : switch on any of _EL_CORE_REPOS that is present
+# but disabled. Prints nothing on the usual host, where they are already on.
+_pkg_enable_core_repos_el() {
+    local id status
+    for id in $_EL_CORE_REPOS; do
+        status=$(_pkg_el_repo_status "$id")
+        [ "$status" = disabled ] || continue
+        step "enabling the ${id} repository (shipped disabled on this host)"
+        if _pkg_el_set_enabled "$id"; then
+            _PKG_REFRESHED=false
+        else
+            warn "could not enable the ${id} repository"
+        fi
+    done
+}
+
 pkg_enable_repos() {
     if [ "$IS_PVE" = true ]; then
         skip_step "repo setup" "Proxmox VE host - leaving apt sources alone"
@@ -188,9 +233,13 @@ pkg_enable_repos() {
 }
 
 _pkg_enable_repos_el() {
-    [ "$SP_DRY_RUN" = true ] && { step "[dry-run] enable EPEL + CRB/PowerTools"; return 0; }
+    [ "$SP_DRY_RUN" = true ] && { step "[dry-run] enable core repos + EPEL + CRB/PowerTools"; return 0; }
 
     pkg_install_native dnf-plugins-core || warn "failed to install dnf-plugins-core"
+
+    # Before EPEL: epel-release is packaged in extras, so a host with extras
+    # disabled cannot find it ("No match for argument: epel-release").
+    _pkg_enable_core_repos_el
 
     if ! rpm -q --quiet epel-release; then
         step "installing epel-release"
@@ -202,13 +251,20 @@ _pkg_enable_repos_el() {
     if have crb; then
         ${SUDO} crb enable || warn "crb enable failed"
     elif [ "${OS_MAJOR:-0}" -le 8 ]; then
-        ${SUDO} "$PKG_MGR" config-manager --set-enabled powertools \
-            || ${SUDO} "$PKG_MGR" config-manager --set-enabled PowerTools \
+        _pkg_el_set_enabled powertools \
+            || _pkg_el_set_enabled PowerTools \
             || warn "could not enable powertools"
     fi
 
     _PKG_REFRESHED=false   # new repos, index must be rebuilt
     pkg_refresh
+
+    # A last sanity check with a real lookup. If even zsh cannot be resolved the
+    # host has no usable repository, and saying so once here beats twenty
+    # "not available in this distro's repos" warnings further down.
+    pkg_available zsh || warn "no repository provides zsh; the package steps below will mostly be skipped.
+      Enabled repositories:
+$(${PKG_MGR} repolist --enabled -q 2>/dev/null | sed -n '2,$s/^/        /p')"
 }
 
 _pkg_enable_repos_debian() {

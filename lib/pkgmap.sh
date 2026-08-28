@@ -12,6 +12,33 @@
 [ -n "${SP_PKGMAP_SOURCED:-}" ] && return 0
 SP_PKGMAP_SOURCED=1
 
+# _pkgmap_pick <candidate>... : the first candidate the enabled repos actually
+# carry, falling back to the first one so the caller still names something.
+# For the handful of tools whose package name moves between releases and there
+# is no version to key off reliably. Each probe costs a repo lookup, so the
+# answer is cached for the rest of the run.
+declare -A _PKGMAP_PICKED=()
+_pkgmap_pick() {
+    local key="$*" c
+    if [ -n "${_PKGMAP_PICKED[$key]:-}" ]; then
+        echo "${_PKGMAP_PICKED[$key]}"
+        return 0
+    fi
+    # pkg_available lives in lib/pkg.sh, which sources this file; it exists by
+    # the time pkgmap is actually called, but not while this file is read.
+    if declare -F pkg_available >/dev/null 2>&1; then
+        for c in "$@"; do
+            if pkg_available "$c"; then
+                _PKGMAP_PICKED[$key]=$c
+                echo "$c"
+                return 0
+            fi
+        done
+    fi
+    _PKGMAP_PICKED[$key]=$1
+    echo "$1"
+}
+
 # pkgmap <canonical> : print the native package list, or nothing when the
 # canonical name has no meaning on this family (e.g. el-toolsets on Debian).
 pkgmap() {
@@ -30,6 +57,10 @@ pkgmap() {
             tmux-build-deps) echo "automake libevent-devel byacc ncurses-devel" ;;
             nvim-build-deps) echo "gcc gcc-c++ make gettext ninja-build curl unzip git patch" ;;
             sctp)            echo "lksctp-tools lksctp-tools-devel" ;;
+            # EL8 has no bare `python3` package - the platform interpreter is
+            # python36 and the newer streams are python3.11/python3.12. EL9+
+            # does ship `python3`, so ask the repos rather than hardcoding.
+            python3)         _pkgmap_pick python3 python3.12 python3.11 python36 ;;
             el-toolsets)     echo "gcc-toolset-13-gcc-c++ gcc-toolset-14-gdb gcc-toolset-13-libasan-devel" ;;
             *)               _pkgmap_common "$name" ;;
         esac

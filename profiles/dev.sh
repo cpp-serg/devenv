@@ -9,13 +9,19 @@ profile_dev() {
 
     run_step "extra developer packages" step_extra_dev || true
     run_step "EL toolsets / dev headers" step_dev_tools || true
+
+    # Rust and Go come first: ensure_tool falls back to a source build for the
+    # tools a distro does not package (lazygit needs Go, bat/delta need Cargo),
+    # and that fallback used to run before either toolchain was installed - on
+    # EL8 the lazygit step failed with "Go not found; run install-golang.sh".
+    run_step "rust" step_rust || true
+    run_step "go" step_go || true
+
     run_step "tmux" step_tmux || true
     run_step "fzf" step_fzf || true
     run_step "bat + delta" step_bat_delta || true
     run_step "lazygit + tig" step_git_uis || true
     run_step "misc CLI tools" step_misc_cli || true
-    run_step "rust" step_rust || true
-    run_step "go" step_go || true
     run_step "claude" step_claude || true
     run_step "SCTP" step_sctp || true
     run_step "login shell" step_chsh || true

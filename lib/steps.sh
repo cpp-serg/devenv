@@ -52,7 +52,10 @@ ensure_tool() {
 
     if [ -n "$builder" ] && [ -x "$builder" ]; then
         warn "${canonical} is not in this distro's repos; building it instead"
-        run_script "$builder"
+        # Report the builder's own exit status. run_step calls these functions in
+        # an `if`, which suspends set -e, so swallowing it here made a failed
+        # build ("Go not found") print ERROR and still count as a passing step.
+        run_script "$builder" || return 1
         return 0
     fi
 
@@ -133,13 +136,21 @@ step_ohmyzsh() {
         return 0
     fi
     have zsh || pkg_install zsh
+    # pkg_install skips what the repos do not carry, so zsh can still be absent.
+    # The upstream installer only prints "Zsh is not installed" and exits, and a
+    # `die` here would take the rest of the bootstrap down with it - run_step is
+    # meant to record the failure and carry on.
+    if [ "$SP_DRY_RUN" != true ] && ! have zsh; then
+        warn "zsh is not installed and could not be installed from the repos"
+        return 1
+    fi
     step "installing oh-my-zsh"
     [ "$SP_DRY_RUN" = true ] && return 0
     # KEEP_ZSHRC keeps the installer from writing its own ~/.zshrc, which the
     # original script had to move out of the way afterwards.
     RUNZSH=no CHSH=no KEEP_ZSHRC=yes \
         sh -c "$(curl -fsSL --retry 3 --retry-delay 2 https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" \
-        || die "oh-my-zsh installation failed"
+        || { warn "oh-my-zsh installation failed"; return 1; }
 }
 
 step_submodules() {
