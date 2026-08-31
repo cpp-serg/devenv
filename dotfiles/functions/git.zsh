@@ -5,6 +5,8 @@ GIT_JPU_CICD_PATH=git@bitbucket.org:jpugit/cicd.git
 GIT_JPU_HSS_PATH=git@bitbucket.org:jpugit/pente-hss.git
 GIT_JPU_MME_PATH=git@bitbucket.org:jpugit/open5gs.git
 GIT_JPU_TESTS_PATH=git@bitbucket.org:jpugit/jpu-tests.git
+GIT_JPU_3GPP_SPEC=git@bitbucket.org:jpugit/3gpp-specs.git
+GIT_JPU_SERVER=git@bitbucket.org:jpugit/jpu.git
 
 function _doClone
 {
@@ -55,6 +57,16 @@ function clone-tests
     _doClone $GIT_JPU_TESTS_PATH automation
 }
 
+function clone-3gpp-specs
+{
+    _doClone $GIT_JPU_3GPP_SPEC 3gpp-specs
+}
+
+function clone-server
+{
+    _doClone $GIT_JPU_SERVER jpu
+}
+
 function clone-all
 {
     clone-ggsn
@@ -64,6 +76,8 @@ function clone-all
     clone-hss
     clone-mme
     clone-tests
+    clone-3gpp-specs
+    clone-server
 }
 
 function git-here
