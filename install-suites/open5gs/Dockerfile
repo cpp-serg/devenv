@@ -33,6 +33,13 @@ RUN dnf -y module enable python39 && \
     python3.9 -m pip install --prefix=/usr meson && \
     ln -sf /usr/bin/meson /usr/local/bin/meson
 
+# Rocky 8.10 repo skew: powertools carries a libnghttp2-devel release
+# (1.33.0-6.el8_10.3) newer than any libnghttp2 in baseos (-6.el8_10.2), and the
+# devel subpackage requires an exact version match, so the newest devel is
+# uninstallable. Pin devel to the base library version actually present.
+RUN dnf -y install libnghttp2 && \
+    dnf -y install "libnghttp2-devel-$(rpm -q --queryformat '%{VERSION}-%{RELEASE}' libnghttp2)"
+
 # ---------- open5gs build dependencies ----------
 RUN dnf -y install \
         lksctp-tools-devel \
@@ -42,7 +49,6 @@ RUN dnf -y install \
         libidn-devel \
         mongo-c-driver-devel \
         libyaml-devel \
-        libnghttp2-devel \
         libmicrohttpd-devel \
         libcurl-devel \
         libtalloc-devel \

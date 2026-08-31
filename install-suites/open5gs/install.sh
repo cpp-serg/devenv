@@ -69,8 +69,15 @@ declare -A BUILD_IP=(
     [hss]=127.0.0.8
 )
 
-# Path to BUILDROOT from the rpmbuild tree (exported by build.sh entrypoint)
-BUILDROOT="${SCRIPT_DIR}/rpms/rpmbuild-BUILDROOT/open5gs-2.7.7-1.el8.x86_64"
+# Path to BUILDROOT from the rpmbuild tree (exported by build.sh entrypoint).
+# rpmbuild names this directory <name>-<version>-<release><dist>.<arch>, so it
+# must track version.env rather than carry a hardcoded version.
+BUILDROOT="${WORK_DIR}/rpms/rpmbuild-BUILDROOT/open5gs-${OPEN5GS_VERSION}-${OPEN5GS_RELEASE}.el8.x86_64"
+if [[ ! -d "${BUILDROOT}" ]]; then
+    echo "ERROR: BUILDROOT not found: ${BUILDROOT}" >&2
+    echo "       Run ./build.sh first, or check that version.env matches the built RPMs." >&2
+    exit 1
+fi
 
 # Detect primary non-loopback IP of this host
 HOST_IP=$(ip -4 route get 1.0.0.0 2>/dev/null | awk '/src/{print $7; exit}')

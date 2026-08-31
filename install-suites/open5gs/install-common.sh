@@ -15,9 +15,16 @@ _INSTALL_COMMON_LOADED=1
 # ============================================================
 : "${MONGODB_VERSION:=7.0}"
 : "${NODEJS_VERSION:=18}"
-: "${OPEN5GS_VERSION:=2.7.7}"
+
+# OPEN5GS_VERSION/OPEN5GS_RELEASE come from version.env (assigned with := there,
+# so an explicit environment variable still wins).
+# shellcheck source=version.env
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/version.env"
 : "${OPEN5GS_REPO:=https://github.com/open5gs/open5gs.git}"
-: "${RPM_DIR:=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/rpms}"
+# Build artifacts live in the directory the script is run from (matching
+# build.sh), not next to the scripts. Set WORK_DIR to override.
+: "${WORK_DIR:=$(pwd)}"
+: "${RPM_DIR:=${WORK_DIR}/rpms}"
 
 # Will be set by setup_sudo
 SUDO=""

@@ -1,3 +1,5 @@
 rpms/
 *.rpm
 .git
+open5gs-source/
+cont_ccache/

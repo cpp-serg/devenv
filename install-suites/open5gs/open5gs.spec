@@ -1,9 +1,16 @@
 %define open5gs_user  open5gs
 %define open5gs_group open5gs
 
+# Version/Release come from version.env, passed in by entrypoint.sh as
+# --define. Do not hardcode them here: rpmbuild derives the BUILD directory
+# that %prep enters from Version:, and build.sh mounts the source at that
+# path, so a literal value here silently drifts out of sync with the build.
+%{!?open5gs_version: %{error:open5gs_version is not defined — build via build.sh, which reads version.env}}
+%{!?open5gs_release: %{error:open5gs_release is not defined — build via build.sh, which reads version.env}}
+
 Name:           open5gs
-Version:        2.7.7
-Release:        1%{?dist}
+Version:        %{open5gs_version}
+Release:        %{open5gs_release}%{?dist}
 Summary:        Open source implementation of 5G Core and EPC
 License:        AGPL-3.0-only
 URL:            https://open5gs.org
@@ -575,6 +582,10 @@ exit 0
 %{_unitdir}/open5gs-bsfd.service
 
 %changelog
+* Mon Aug 31 2026 Open5GS Builder <builder@open5gs.org> - 2.8.0-1
+- Update to upstream v2.8.0
+- Version/Release now supplied from version.env via rpmbuild --define
+
 * Tue Mar 17 2026 Open5GS Builder <builder@open5gs.org> - 2.7.7-1
 - Build for Rocky Linux 9
 - Adapted from community openSUSE spec (home:mnhauke:open5gs)

@@ -15,11 +15,16 @@ set -euo pipefail
 # ============================================================
 MONGODB_VERSION="7.0"
 NODEJS_VERSION="18"
-OPEN5GS_VERSION="2.7.7"
+
+# OPEN5GS_VERSION/OPEN5GS_RELEASE come from version.env — do not hardcode them.
+# shellcheck source=version.env
+source "$(cd "$(dirname "$0")" && pwd)/version.env"
 OPEN5GS_REPO="https://github.com/open5gs/open5gs.git"
 
-# Where the built RPMs live (default: ./rpms/)
-RPM_DIR="$(cd "$(dirname "$0")" && pwd)/rpms"
+# Where the built RPMs live: under the directory this script is run from
+# (matching build.sh), not next to the scripts. Set WORK_DIR to override.
+: "${WORK_DIR:=$(pwd)}"
+RPM_DIR="${WORK_DIR}/rpms"
 
 # Parse args
 while [[ $# -gt 0 ]]; do
