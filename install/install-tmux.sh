@@ -7,7 +7,7 @@ pkg_install tmux-build-deps make
 _workdir
 git clone https://github.com/tmux/tmux.git --branch "${TMUX_VER}" --single-branch && cd tmux \
   || die "Failed to clone tmux ${TMUX_VER}"
-sh autogen.sh && ./configure --prefix=/opt/tmux && make -j
+sh autogen.sh && ./configure --prefix=/opt/tmux --enable-sixel && make -j
 ${SUDO} make install
 
 ${SUDO} update-alternatives --install /usr/local/bin/tmux tmux /opt/tmux/bin/tmux 100
