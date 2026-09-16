@@ -6,6 +6,10 @@
 #   pente-edge run     <id|ip> <cmd...>     → run a command on the edge (non-interactive)
 #   pente-edge connect <id|ip>              → interactive shell on the edge
 #   pente-edge mongo   <id|ip> <js>         → mongosh --eval against the edge's local Mongo
+#   pente-edge fput [-f] <id|ip> <local...> <remote>   → scp files onto the edge
+#   pente-edge fget [-f] <id|ip> <remote...> <local>   → scp files off the edge
+#                      destination "%" = the same path on the other side;
+#                      an existing destination is confirmed unless -f is given
 #   pente-edge config  <id>                 → append a reusable `Host EDGE-<id>` ssh block
 #   pente-edge warm    <id|ip>              → pre-open the shared ssh socket
 #   pente-edge close   <id|ip>              → close it (kills the holder session)
@@ -35,15 +39,24 @@ EDGE_MONGO_USER="${EDGE_MONGO_USER:-Administrator}"   # edge-local mongo
 EDGE_MONGO_PASS="${EDGE_MONGO_PASS:-admin123}"          # blank → platform default
 EDGE_CACHE_TTL="${EDGE_CACHE_TTL:-86400}"       # ID→IP cache lifetime, seconds
 EDGE_MASTER_TTL="${EDGE_MASTER_TTL:-3600}"      # shared ssh socket lifetime, sec
+EDGE_PING_TIMEOUT="${EDGE_PING_TIMEOUT:-2}"     # seconds for the one-shot ping gate
+EDGE_PROBE_TTL="${EDGE_PROBE_TTL:-86400}"       # how long a probed address is trusted
+EDGE_SKIP_PING="${EDGE_SKIP_PING:-0}"           # 1 = go straight to the ssh probe
+EDGE_VERIFY_ID="${EDGE_VERIFY_ID:-1}"           # 1 = reject a box reporting another id
+EDGE_HOSTKEY_TTL="${EDGE_HOSTKEY_TTL:-86400}"   # how long a host-key check is trusted
+EDGE_MIRROR="${EDGE_MIRROR:-%}"                 # fput/fget destination meaning "same path"
+EDGE_FORCE="${EDGE_FORCE:-0}"                   # 1 = overwrite local files without asking
 # ──────────────────────────────────────────────────────────────────────────────
 
 CC="$EDGE_CC"
 PASSFILE="$EDGE_PASS_FILE"
 TTL="$EDGE_CACHE_TTL"
-CACHE="${XDG_CACHE_HOME:-$HOME/.cache}/pente-edge/edges.tsv"
+CACHE="${EDGE_CACHE_FILE:-${XDG_CACHE_HOME:-$HOME/.cache}/pente-edge/edges.v2.tsv}"
 KNOWN="$HOME/.ssh/known_hosts_edges"
 SOCK="$HOME/.ssh/sockets/edge-%r@%h:%p"
 CFG_DIR="$HOME/.ssh/shared/edges"          # picked up by `Include shared/**/config`
+CHOSEN_DIR="$(dirname "$CACHE")/chosen"    # probed address per CC+edge, mtime = when
+HOSTKEY_DIR="$(dirname "$CACHE")/hostkey"  # last host-key verification, mtime = when
 REMOTE_CFG=/home/pente/pente-server/config/localconfig.json
 
 die() { printf 'pente-edge: %s\n' "$*" >&2; exit 1; }
@@ -54,6 +67,63 @@ validate_key() {
   [[ "$1" =~ ^[A-Za-z0-9_.-]+$ ]] || die "refusing unsafe edge id/name: '$1'"
 }
 is_ip() { [[ "$1" =~ ^[0-9]{1,3}(\.[0-9]{1,3}){3}$ ]]; }
+
+# Absolute form of a local path, kept *logical*: no symlink resolution, so the
+# mirrored remote path is the one the user typed rather than its physical target.
+abs_path() {
+  case "$1" in
+    /*) printf '%s\n' "$1" ;;
+    *)  printf '%s\n' "$PWD/${1#./}" ;;
+  esac
+}
+
+# Ask before clobbering a local file. EDGE_FORCE=1 skips the question, which is
+# also the only way through when there is no terminal to ask on -- so the same
+# command works unattended in a script or a cron job.
+# $1: "local" or "remote", $2: path
+confirm_overwrite() {
+  local side="$1" path="$2" ans
+  [[ "$EDGE_FORCE" == 1 ]] && return 0
+  if [[ -c /dev/tty ]] && { : >/dev/tty; } 2>/dev/null; then
+    printf 'pente-edge: %s %s exists. Overwrite? [y/N] ' "$side" "$path" >/dev/tty
+    IFS= read -r ans </dev/tty || ans=""
+    [[ "$ans" == [yY]* ]] && return 0
+    return 1
+  fi
+  note "refusing to overwrite $side $path — no terminal to ask on."
+  note "Pass -f (or set EDGE_FORCE=1) to overwrite, or pick a free destination."
+  return 1
+}
+
+# Where a copy of $2 would actually land under destination $3, and whether that
+# target already exists. scp puts the source *inside* an existing directory, so
+# the answer depends on the remote side and needs one round trip to settle.
+# echoes: "<resolved target>\t<0|1 exists>"
+remote_target() {
+  local ip="$1" base; base=$(basename -- "$2")
+  edge_ssh "$ip" "bash -s $(printf '%q %q' "$3" "$base")" <<'EOS'
+d=$1; b=$2
+if [ -d "$d" ]; then t="${d%/}/$b"; else t="$d"; fi
+if [ -e "$t" ]; then printf '%s\t1\n' "$t"; else printf '%s\t0\n' "$t"; fi
+EOS
+}
+
+local_target() {
+  local base; base=$(basename -- "$1")
+  if [[ -d "$2" ]]; then printf '%s\n' "${2%/}/$base"; else printf '%s\n' "$2"; fi
+}
+
+# Split one TSV line into named variables.
+#
+# `IFS=$'\t' read` cannot be used: tab is IFS *whitespace*, so a run of tabs
+# collapses into one delimiter and every field after an empty one shifts left.
+# 59 of 184 EdgeSites have an empty S1APAddress, which silently put Status into
+# the S1AP slot. \x1f is not whitespace, so empty fields are preserved.
+#   usage: split_tsv "<line>" var1 var2 ...
+split_tsv() {
+  local line=${1//$'\t'/$'\x1f'}; shift
+  IFS=$'\x1f' read -r "$@" <<< "$line"
+}
 
 ssh_edge_opts() {
   printf '%s\0' \
@@ -68,11 +138,29 @@ ssh_edge_opts() {
 
 # ---------------------------------------------------------------- resolution
 
+# All CC traffic shares one socket: resolution, the ping gate and each edge's
+# ProxyJump otherwise pay a fresh handshake to the CC every time.
+cc_ssh_opts() {
+  printf '%s\0' \
+    -o "BatchMode=yes" \
+    -o "ControlMaster=auto" \
+    -o "ControlPath=$HOME/.ssh/sockets/cc-%r@%h:%p" \
+    -o "ControlPersist=60m" \
+    -o "ConnectTimeout=20"
+}
+
+cc_ssh() {
+  local -a opts=()
+  while IFS= read -r -d '' o; do opts+=("$o"); done < <(cc_ssh_opts)
+  mkdir -p "$HOME/.ssh/sockets"; chmod 700 "$HOME/.ssh/sockets"
+  ssh "${opts[@]}" "$CC" "$@"
+}
+
 # Query the CC's Couchbase for one EdgeSite. Credentials are read out of the
 # CC's localconfig.json *inside* the remote shell and never reach stdout here.
 cc_query() {
   local where="$1"
-  ssh -o BatchMode=yes "$CC" 'bash -s' <<REMOTE 2>/dev/null
+  cc_ssh 'bash -s' <<REMOTE 2>/dev/null
 set -euo pipefail
 read -r U P H <<< "\$(python3 - "$REMOTE_CFG" <<'PY'
 import json, sys
@@ -87,11 +175,11 @@ print(u, p, h)
 PY
 )"
 curl -s --max-time 30 -u "\$U:\$P" "http://\$H:8093/query/service" \
-  --data-urlencode 'statement=SELECT ShortId, Name, vRouterIp, S1APAddress, Version FROM JPUDB USE INDEX (i_TypeJpuDb) WHERE Type = "EdgeSite" AND ($where) ORDER BY ShortId LIMIT 200'
+  --data-urlencode 'statement=SELECT ShortId, Name, vRouterIp, S1APAddress, Version, Status FROM JPUDB USE INDEX (i_TypeJpuDb) WHERE Type = "EdgeSite" AND ($where) ORDER BY ShortId LIMIT 200'
 REMOTE
 }
 
-# Turn the query envelope into TSV: shortid name ip s1ap version
+# Turn the query envelope into TSV: shortid name ip s1ap version status
 cc_query_tsv() {
   cc_query "$1" | python3 -c '
 import sys, json
@@ -103,19 +191,20 @@ if d.get("errors"):
     sys.exit("couchbase: %s" % d["errors"])
 for r in d.get("results", []):
     print("\t".join(str(r.get(k, "")) for k in
-          ("ShortId", "Name", "vRouterIp", "S1APAddress", "Version")))
+          ("ShortId", "Name", "vRouterIp", "S1APAddress", "Version", "Status")))
 '
 }
 
 cache_get() {
   [[ -f "$CACHE" ]] || return 1
-  local now line ts
+  local now line id name ip s1ap ver status cc ts
   now=$(date +%s)
-  while IFS=$'\t' read -r id name ip s1ap ver cc ts; do
+  while IFS= read -r line; do
+    split_tsv "$line" id name ip s1ap ver status cc ts
     [[ "$id" == "$1" || "$name" == "$1" ]] || continue
     [[ "$cc" == "$CC" ]] || continue
     (( now - ts < TTL )) || return 1
-    printf '%s\t%s\t%s\t%s\t%s\n' "$id" "$name" "$ip" "$s1ap" "$ver"
+    printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$id" "$name" "$ip" "$s1ap" "$ver" "$status"
     return 0
   done < "$CACHE"
   return 1
@@ -125,36 +214,134 @@ cache_put() {
   mkdir -p "$(dirname "$CACHE")"
   local id="$1"
   [[ -f "$CACHE" ]] && { grep -v -P "^\Q$id\E\t" "$CACHE" > "$CACHE.tmp" 2>/dev/null || true; mv "$CACHE.tmp" "$CACHE"; }
-  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$1" "$2" "$3" "$4" "$5" "$CC" "$(date +%s)" >> "$CACHE"
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$1" "$2" "$3" "$4" "$5" "$6" "$CC" "$(date +%s)" >> "$CACHE"
 }
 
-# echoes: id name ip s1ap version
+# echoes: id name ip s1ap version status
 resolve() {
   local key="$1" row
   validate_key "$key"
   if row=$(cache_get "$key"); then printf '%s\n' "$row"; return 0; fi
   row=$(cc_query_tsv "TOSTRING(ShortId) = \"$key\" OR LOWER(Name) = LOWER(\"$key\")" | head -1)
   [[ -n "$row" ]] || die "no EdgeSite with ShortId/Name '$key' on $CC"
-  IFS=$'\t' read -r id name ip s1ap ver <<< "$row"
+  local id name ip s1ap ver status
+  split_tsv "$row" id name ip s1ap ver status
   [[ -n "$ip" ]] || die "edge '$key' has no vRouterIp on $CC (never provisioned?)"
-  cache_put "$id" "$name" "$ip" "$s1ap" "$ver"
-  printf '%s\t%s\t%s\t%s\t%s\n' "$id" "$name" "$ip" "$s1ap" "$ver"
+  cache_put "$id" "$name" "$ip" "$s1ap" "$ver" "$status"
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$id" "$name" "$ip" "$s1ap" "$ver" "$status"
 }
 
-# accepts an ID, a name, or a literal IP; echoes just the IP
+# ------------------------------------------------------- address probing
+
+# ICMP from the CC, because that is where every edge ssh originates. One packet,
+# short deadline: this is only a gate to avoid a 20s ssh timeout on a dead host.
+ping_via_cc() {
+  local ip="$1"
+  [[ "$EDGE_SKIP_PING" == 1 ]] && return 0
+  cc_ssh "ping -c1 -w$EDGE_PING_TIMEOUT -W$EDGE_PING_TIMEOUT -q $ip >/dev/null 2>&1" 2>/dev/null
+}
+
+# Try one ssh to $1 and echo the EdgeShortId the box reports (empty if it cannot
+# be read). Returns 0 only if the ssh itself succeeded.
+#
+# A recycled lab address can have a stale key in $KNOWN, which makes ssh abort
+# with "REMOTE HOST IDENTIFICATION HAS CHANGED" instead of connecting. Since
+# accept-new only covers *unknown* hosts, drop the offending key and retry once.
+probe_ssh() {
+  local ip="$1" out rc attempt
+  ensure_host_key "$ip"
+  local remote='sed -n "s/.*\"EdgeShortId\"[[:space:]]*:[[:space:]]*\"\{0,1\}\([0-9]\{1,\}\).*/\1/p" /home/pente/pente-server/config/*.json 2>/dev/null | head -1'
+  for attempt in 1 2; do
+    out=$(edge_ssh_raw "$ip" "$remote" 2>&1); rc=$?
+    (( rc == 0 )) && { printf '%s\n' "$(grep -oE '^[0-9]+$' <<< "$out" | head -1)"; return 0; }
+    if (( attempt == 1 )) && grep -qE 'REMOTE HOST IDENTIFICATION HAS CHANGED|Host key verification failed|key for .* has changed' <<< "$out"; then
+      note "  (stale host key for $ip — removing it from $(basename "$KNOWN") and retrying)"
+      ssh-keygen -R "$ip" -f "$KNOWN" >/dev/null 2>&1 || true
+      continue
+    fi
+    return 1
+  done
+  return 1
+}
+
+chosen_file() { printf '%s/%s-%s\n' "$CHOSEN_DIR" "$CC" "$1"; }
+
+chosen_get() {
+  local f; f=$(chosen_file "$1")
+  [[ -r "$f" ]] || return 1
+  local age=$(( $(date +%s) - $(stat -c %Y "$f" 2>/dev/null || echo 0) ))
+  (( age < EDGE_PROBE_TTL )) || return 1
+  cat "$f"
+}
+
+chosen_put() {
+  mkdir -p "$CHOSEN_DIR"
+  printf '%s\n' "$2" > "$(chosen_file "$1")"
+}
+
+# Pick the address that actually works, in the documented order:
+#   vRouterIp (the CC's management/tunnel address) -> S1APAddress -> give up.
+# Each candidate must answer a ping and then an ssh; when EDGE_VERIFY_ID is on,
+# it must also report the EdgeShortId we asked for. S1APAddress is not unique
+# across EdgeSites, so an unverified fallback can land on a different edge.
+select_ip() {
+  local want="$1" vrouter="$2" s1ap="${3%%/*}" pair label cand id
+  for pair in "vRouterIp=$vrouter" "S1APAddress=$s1ap"; do
+    label=${pair%%=*}; cand=${pair#*=}
+    [[ -n "$cand" ]] || continue
+    if ! ping_via_cc "$cand"; then
+      note "  $label $cand — no ping (${EDGE_PING_TIMEOUT}s), skipping ssh"
+      continue
+    fi
+    if ! id=$(probe_ssh "$cand"); then
+      note "  $label $cand — ping ok but ssh failed"
+      continue
+    fi
+    if [[ "$EDGE_VERIFY_ID" == 1 && -n "$id" && -n "$want" && "$id" != "$want" ]]; then
+      note "  $label $cand — ssh ok, but this box reports EdgeShortId=$id, not $want."
+      note "    Refusing it: that is a different edge. Set EDGE_VERIFY_ID=0 to allow."
+      continue
+    fi
+    [[ -z "$id" ]] && note "  $label $cand — ssh ok (could not read EdgeShortId to verify)"
+    note "  $label $cand — reachable, using it"
+    printf '%s\n' "$cand"
+    return 0
+  done
+  return 1
+}
+
+# accepts an ID, a name, or a literal IP; echoes the address to connect to.
+# A literal IP is used as given — no lookup, no probing.
 target_ip() {
-  if is_ip "$1"; then printf '%s\n' "$1"; else resolve "$1" | cut -f3; fi
+  if is_ip "$1"; then printf '%s\n' "$1"; return 0; fi
+  local row id name ip s1ap ver status pick
+  row=$(resolve "$1")
+  split_tsv "$row" id name ip s1ap ver status
+
+  # A live shared socket already proves an address works; don't re-probe.
+  if have_socket "$ip"; then printf '%s\n' "$ip"; return 0; fi
+  local bare=${s1ap%%/*}
+  if [[ -n "$bare" ]] && have_socket "$bare"; then printf '%s\n' "$bare"; return 0; fi
+  if pick=$(chosen_get "$id"); then printf '%s\n' "$pick"; return 0; fi
+
+  if pick=$(select_ip "$id" "$ip" "$s1ap"); then
+    chosen_put "$id" "$pick"
+    printf '%s\n' "$pick"
+    return 0
+  fi
+  die "edge $id ($name): no usable address. vRouterIp $ip and S1APAddress ${s1ap:-none} both failed — IP unknown."
 }
 
 # Cache a whole listing at once (stdin: the same TSV resolve() emits). Rows for
 # edges not in this listing are kept, so caches for other CCs survive.
 cache_put_bulk() {
   mkdir -p "$(dirname "$CACHE")"
-  local now tmp keep id name ip s1ap ver
+  local now tmp keep line id name ip s1ap ver status
   now=$(date +%s); tmp=$(mktemp); keep=$(mktemp)
-  while IFS=$'\t' read -r id name ip s1ap ver; do
+  while IFS= read -r line; do
+    split_tsv "$line" id name ip s1ap ver status
     [[ -n "$id" ]] || continue
-    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$id" "$name" "$ip" "$s1ap" "$ver" "$CC" "$now"
+    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$id" "$name" "$ip" "$s1ap" "$ver" "$status" "$CC" "$now"
   done > "$tmp"
   if [[ -s "$tmp" && -f "$CACHE" ]]; then
     awk -F'\t' 'NR==FNR { seen[$1]=1; next } !($1 in seen)' "$tmp" "$CACHE" > "$keep"
@@ -174,16 +361,86 @@ have_socket() {
 
 have_pass() { [[ -n "$EDGE_PASS" || -r "$PASSFILE" ]]; }
 
-# Run one ssh with password auth. sshpass needs no tty of its own (it allocates
-# a pty), so this works fine from a non-interactive harness.
-pass_ssh() {
+# Make sure $KNOWN does not hold a key the host no longer presents.
+#
+# accept-new covers *unknown* hosts, but a recycled lab address with a changed
+# key aborts ssh/scp with "REMOTE HOST IDENTIFICATION HAS CHANGED" before any
+# per-command retry can see it. probe_ssh recovers reactively, yet it is skipped
+# for a literal IP argument, for a fresh probe-cache hit and for warm/close --
+# so every transport calls this first instead.
+#
+# The comparison is done against what the host actually presents, scanned from
+# the CC (which can reach the tunnel network); over the shared CC socket that
+# costs a fraction of a second. If the scan yields nothing, leave the entry
+# alone and let ssh decide rather than dropping a key on a transient failure.
+declare -A HOSTKEY_CHECKED=()
+ensure_host_key() {
+  local ip="$1" stored live k marker age
+  # The scan is the only expensive part (~1.4s), and the cold path reaches here
+  # twice: once inside target_ip's probe and again before opening the master
+  # socket. target_ip runs in a command substitution, so an in-process flag does
+  # not survive back to the caller -- hence a marker file, like the probe cache.
+  [[ -n "${HOSTKEY_CHECKED[$ip]:-}" ]] && return 0
+  HOSTKEY_CHECKED[$ip]=1
+  marker="$HOSTKEY_DIR/$ip"
+  if [[ -r "$marker" ]]; then
+    age=$(( $(date +%s) - $(stat -c %Y "$marker" 2>/dev/null || echo 0) ))
+    (( age < EDGE_HOSTKEY_TTL )) && return 0
+  fi
+  [[ -r "$KNOWN" ]] || return 0
+  stored=$(ssh-keygen -F "$ip" -f "$KNOWN" 2>/dev/null | awk '!/^#/ {print $3}' | sort -u)
+  [[ -n "$stored" ]] || return 0          # unknown host: accept-new handles it
+  live=$(cc_ssh "ssh-keyscan -T 5 $ip 2>/dev/null" 2>/dev/null | awk 'NF>=3 {print $3}' | sort -u)
+  [[ -n "$live" ]] || return 0
+  while IFS= read -r k; do
+    [[ -n "$k" ]] || continue
+    if grep -qxF -- "$k" <<< "$live"; then
+      mkdir -p "$HOSTKEY_DIR"; : > "$marker"
+      return 0
+    fi
+  done <<< "$stored"
+  note "note: host key for $ip changed — dropping the stale entry from $(basename "$KNOWN")"
+  ssh-keygen -R "$ip" -f "$KNOWN" >/dev/null 2>&1 || true
+  mkdir -p "$HOSTKEY_DIR"; : > "$marker"
+}
+
+# One ssh attempt against an edge address: real exit code, stderr included, and
+# no master socket left behind for an address the probe may reject. Options are
+# listed explicitly rather than reusing ssh_edge_opts because ssh honours the
+# FIRST -o for a keyword, so ControlMaster could not be overridden afterwards.
+edge_ssh_raw() {
+  local ip="$1"; shift
+  local -a opts=(
+    -o "ControlMaster=no"
+    -o "ControlPath=none"
+    -o "StrictHostKeyChecking=accept-new"
+    -o "UserKnownHostsFile=$KNOWN"
+    -o "ProxyJump=$CC"
+    -o "ConnectTimeout=10"
+    -o "NumberOfPasswordPrompts=1"
+  )
   if [[ -n "$EDGE_PASS" ]]; then
-    # -e, not -p: keeps the password out of the process list
-    SSHPASS="$EDGE_PASS" sshpass -e ssh "$@"
+    SSHPASS="$EDGE_PASS" sshpass -e ssh "${opts[@]}" "$EDGE_USER@$ip" "$@"
+  elif [[ -r "$PASSFILE" ]]; then
+    sshpass -f "$PASSFILE" ssh "${opts[@]}" "$EDGE_USER@$ip" "$@"
   else
-    sshpass -f "$PASSFILE" ssh "$@"
+    ssh "${opts[@]}" -o BatchMode=yes "$EDGE_USER@$ip" "$@"
   fi
 }
+
+# Run ssh/scp under password auth. sshpass needs no tty of its own (it allocates
+# a pty), so this works fine from a non-interactive harness.
+pass_cmd() {
+  local prog="$1"; shift
+  if [[ -n "$EDGE_PASS" ]]; then
+    # -e, not -p: keeps the password out of the process list
+    SSHPASS="$EDGE_PASS" sshpass -e "$prog" "$@"
+  else
+    sshpass -f "$PASSFILE" "$prog" "$@"
+  fi
+}
+pass_ssh() { pass_cmd ssh "$@"; }
+pass_scp() { pass_cmd scp "$@"; }
 
 # Open a shared ControlMaster socket so later calls need no password.
 #
@@ -230,7 +487,9 @@ edge_ssh() {
   while IFS= read -r -d '' o; do opts+=("$o"); done < <(ssh_edge_opts)
   mkdir -p "$HOME/.ssh/sockets"; chmod 700 "$HOME/.ssh/sockets"
 
-  if have_socket "$ip" || ensure_master "$ip"; then
+  if have_socket "$ip"; then
+    ssh "${opts[@]}" "$EDGE_USER@$ip" "$@"
+  elif ensure_host_key "$ip"; ensure_master "$ip"; then
     ssh "${opts[@]}" "$EDGE_USER@$ip" "$@"
   elif have_pass; then
     note "note: could not open a shared socket; authenticating per call (slower)"
@@ -243,19 +502,70 @@ edge_ssh() {
   fi
 }
 
+# scp over the same shared socket run/connect use, so a transfer costs no extra
+# authentication. When the socket is live scp multiplexes over it and ProxyJump
+# is not consulted at all.
+edge_scp() {
+  local ip="$1"; shift
+  local -a opts=(
+    -p
+    -o "StrictHostKeyChecking=accept-new"
+    -o "UserKnownHostsFile=$KNOWN"
+    -o "ControlMaster=auto"
+    -o "ControlPath=$SOCK"
+    -o "ControlPersist=60m"
+    -o "ProxyJump=$CC"
+    -o "ConnectTimeout=20"
+  )
+  mkdir -p "$HOME/.ssh/sockets"; chmod 700 "$HOME/.ssh/sockets"
+
+  if have_socket "$ip"; then
+    scp "${opts[@]}" "$@"
+  elif ensure_host_key "$ip"; ensure_master "$ip"; then
+    scp "${opts[@]}" "$@"
+  elif have_pass; then
+    note "note: could not open a shared socket; authenticating this transfer alone"
+    pass_scp "${opts[@]}" "$@"
+  else
+    note "No live socket, EDGE_PASS is empty and $PASSFILE is unreadable."
+    note "Set EDGE_PASS in $(basename "$0"), or export EDGE_PASS."
+    exit 2
+  fi
+}
+
 # ---------------------------------------------------------------- subcommands
 
 cmd_ip() {
   [[ $# -ge 1 ]] || die "usage: pente-edge ip <id|name>"
-  IFS=$'\t' read -r id name ip s1ap ver < <(resolve "$1")
-  printf 'Edge %s (%s) on %s\n  mgmt (vRouterIp) : %s\n  S1AP             : %s\n  Version (target) : %s\n' \
-    "$id" "$name" "$CC" "$ip" "$s1ap" "$ver"
+  local id name ip s1ap ver status pick
+  split_tsv "$(resolve "$1")" id name ip s1ap ver status
+  printf 'Edge %s (%s) on %s\n  vRouterIp        : %s\n  S1APAddress      : %s\n  Version (target) : %s\n  CC Status        : %s\n' \
+    "$id" "$name" "$CC" "$ip" "${s1ap:-none}" "$ver" "$status"
+
+  note ""
+  note "Probing for a usable address (ping ${EDGE_PING_TIMEOUT}s, then ssh, via $CC):"
+  if pick=$(chosen_get "$id"); then
+    note "  cached probe result (<${EDGE_PROBE_TTL}s old)"
+    printf '\n  edge ip          : %s\n' "$pick"
+    return 0
+  fi
+  if pick=$(select_ip "$id" "$ip" "$s1ap"); then
+    chosen_put "$id" "$pick"
+    printf '\n  edge ip          : %s\n' "$pick"
+    return 0
+  fi
+  printf '\n  edge ip          : UNKNOWN\n'
+  note ""
+  note "Neither vRouterIp nor S1APAddress answered, so the IP is unknown."
+  [[ "$status" == True || "$status" == true ]] || note \
+    "CC Status is $status: check ALARMS_LAST_STATE_EdgeSite_* for an IPSec/tunnel alarm."
+  return 3
 }
 
 cmd_list() {
   local rows
   rows=$(cc_query_tsv 'ShortId IS NOT MISSING')
-  printf 'ShortId\tName\tvRouterIp\tS1APAddress\tVersion\n'
+  printf 'ShortId\tName\tvRouterIp\tS1APAddress\tVersion\tStatus\n'
   printf '%s\n' "$rows"
   # Seed the cache from the listing — this is what makes shell completion useful.
   printf '%s\n' "$rows" | cache_put_bulk
@@ -283,6 +593,119 @@ cmd_mongo() {
   edge_ssh "$ip" mongosh --quiet \
     "$(printf '%q' "mongodb://$EDGE_MONGO_USER:$EDGE_MONGO_PASS@127.0.0.1:27017/pente?authSource=admin")" \
     --eval "$(printf '%q' "$1")"
+}
+
+# Both take scp argument order: sources first, destination last. A destination
+# of $EDGE_MIRROR ("%" by default) means "the same path on the other side", and
+# each source is then transferred separately since each has its own destination.
+#
+# An existing destination is always confirmed first -- see confirm_overwrite.
+cmd_fput() {
+  local force=0
+  while [[ ${1-} == -* ]]; do
+    case "$1" in
+      -f|--force) force=1; shift ;;
+      --)         shift; break ;;           # so a file named "-f" can follow
+      *)          die "unknown flag for fput: $1 (only -f/--force)" ;;
+    esac
+  done
+  (( force )) && EDGE_FORCE=1
+  [[ $# -ge 3 ]] || die "usage: pente-edge fput [-f] <id|ip> <local-path...> <remote-path|$EDGE_MIRROR>"
+  local target="$1"; shift
+  local dest="${@: -1}"
+  local -a srcs=("${@:1:$#-1}")
+  local ip f abs parent probe tgt exists; ip=$(target_ip "$target")
+  for f in "${srcs[@]}"; do [[ -e "$f" ]] || die "no such local path: $f"; done
+
+  if [[ "$dest" == "$EDGE_MIRROR" ]]; then
+    for f in "${srcs[@]}"; do
+      abs=$(abs_path "$f"); parent=$(dirname -- "$abs")
+      local -a flags=(); [[ -d "$f" ]] && flags=(-r)
+      if edge_ssh "$ip" "test -e $(printf '%q' "$abs")" 2>/dev/null; then
+        confirm_overwrite remote "$abs" || { note "skipped $abs"; continue; }
+      fi
+      note "→ $EDGE_USER@$ip:$abs  (mirrored, via $CC)"
+      # scp will not create the remote tree, so do it first.
+      edge_ssh "$ip" "mkdir -p -- $(printf '%q' "$parent")" \
+        || die "cannot create $parent on the edge"
+      # Copy INTO the parent, not onto $abs: `scp -r src dst` puts src *inside*
+      # dst when dst already exists, which would nest dir/dir on a repeat run.
+      # Targeting the parent gives parent/basename either way.
+      edge_scp "$ip" "${flags[@]}" "$f" "$EDGE_USER@$ip:$parent/"
+    done
+    return
+  fi
+
+  local -a keep=() flags=()
+  for f in "${srcs[@]}"; do
+    split_tsv "$(remote_target "$ip" "$f" "$dest")" tgt exists
+    if [[ "$exists" == 1 ]]; then
+      confirm_overwrite remote "$tgt" || { note "skipped $f"; continue; }
+    fi
+    keep+=("$f")
+    [[ -d "$f" ]] && flags=(-r)
+  done
+  (( ${#keep[@]} )) || { note "nothing to transfer"; return 0; }
+  note "→ $EDGE_USER@$ip:$dest  (via $CC)"
+  edge_scp "$ip" "${flags[@]}" "${keep[@]}" "$EDGE_USER@$ip:$dest"
+}
+
+cmd_fget() {
+  local force=0
+  while [[ ${1-} == -* ]]; do
+    case "$1" in
+      -f|--force) force=1; shift ;;
+      --)         shift; break ;;           # so a file named "-f" can follow
+      *)          die "unknown flag for fget: $1 (only -f/--force)" ;;
+    esac
+  done
+  (( force )) && EDGE_FORCE=1
+  [[ $# -ge 3 ]] || die "usage: pente-edge fget [-f] <id|ip> <remote-path...> <local-dest|$EDGE_MIRROR>"
+  local target="$1"; shift
+  local dest="${@: -1}"
+  local -a srcs=("${@:1:$#-1}")
+  local ip f parent tgt
+
+  if [[ "$dest" == "$EDGE_MIRROR" ]]; then
+    # A relative remote path would be relative to the edge's home directory,
+    # which this side cannot know, so mirroring requires absolute paths.
+    for f in "${srcs[@]}"; do
+      [[ "$f" == /* ]] || die "fget $EDGE_MIRROR needs absolute remote paths (got: $f)"
+    done
+    ip=$(target_ip "$target")
+    for f in "${srcs[@]}"; do
+      if [[ -e "$f" ]] && ! confirm_overwrite local "$f"; then
+        note "skipped $f"
+        continue
+      fi
+      parent=$(dirname -- "$f")
+      mkdir -p -- "$parent" || die "cannot create local $parent"
+      note "← $EDGE_USER@$ip:$f  →  $f  (mirrored)"
+      # into the parent, for the same reason as fput above
+      edge_scp "$ip" -r "$EDGE_USER@$ip:$f" "$parent/"
+    done
+    return
+  fi
+
+  (( ${#srcs[@]} > 1 )) && [[ ! -d "$dest" ]] && \
+    die "multiple remote paths need an existing local directory as destination: $dest"
+  local -a keep=()
+  for f in "${srcs[@]}"; do
+    tgt=$(local_target "$f" "$dest")
+    if [[ -e "$tgt" ]] && ! confirm_overwrite local "$tgt"; then
+      note "skipped $f"
+      continue
+    fi
+    keep+=("$f")
+  done
+  (( ${#keep[@]} )) || { note "nothing to transfer"; return 0; }
+  ip=$(target_ip "$target")
+  local -a remote=()
+  for f in "${keep[@]}"; do remote+=("$EDGE_USER@$ip:$f"); done
+  note "← $EDGE_USER@$ip  (via $CC)"
+  # -r unconditionally: we cannot tell from here whether a remote path is a dir,
+  # and it is a no-op for regular files.
+  edge_scp "$ip" -r "${remote[@]}" "$dest"
 }
 
 cmd_config() {
@@ -331,6 +754,10 @@ cmd_close() {
 }
 
 cmd_zsh_comp() {
+  # Baked in from this script's own $CACHE, so the completer can never read a
+  # different file than the one the tool writes.
+  printf '_pente_edge_cache_default=%q\n' "$CACHE"
+  printf '_pente_edge_mirror=%q\n\n' "$EDGE_MIRROR"
   cat <<'ZSHCOMP'
 # zsh completion for pente-edge. Source it from your dotfiles, after compinit:
 #
@@ -341,7 +768,7 @@ cmd_zsh_comp() {
 # `pente-edge ip <id>` adds the one edge it resolved.
 
 _pente_edge_cache_file() {
-    print -r -- "${EDGE_CACHE_FILE:-${XDG_CACHE_HOME:-$HOME/.cache}/pente-edge/edges.tsv}"
+    print -r -- "${EDGE_CACHE_FILE:-$_pente_edge_cache_default}"
 }
 
 # $1: "ids" to offer only edge ids, anything else to offer ids and IPs
@@ -352,7 +779,7 @@ _pente_edge_targets() {
         return 1
     fi
     local -a ids ips
-    # field order: id name ip s1ap version cc timestamp
+    # field order: id name ip s1ap version status cc timestamp
     ids=( ${(f)"$(awk -F'\t' '$1 != "" {
             name = ($2 == "" ? "(unnamed)" : $2); gsub(/:/, "-", name)
             print $1 ":" name (($3 == "") ? "" : " [" $3 "]")
@@ -374,6 +801,8 @@ _pente_edge() {
         'run:run a command on the edge'
         'connect:open an interactive shell on the edge'
         'mongo:run mongosh --eval on the edge'
+        'fput:scp local files onto the edge'
+        'fget:scp files off the edge'
         'config:write a reusable `ssh EDGE-<id>` alias'
         'warm:pre-open the shared ssh socket'
         'close:close the shared ssh socket'
@@ -387,10 +816,23 @@ _pente_edge() {
         return
     fi
 
-    if (( CURRENT == 3 )); then
+    # fput/fget accept leading flags, so the <id|ip> is the first word after the
+    # subcommand that is not one.
+    local -i idx=3
+    while (( idx < CURRENT )) && \
+          { [[ ${words[idx]} == -f ]] || [[ ${words[idx]} == --force ]] }; do
+        (( idx++ ))
+    done
+
+    if (( CURRENT == idx )); then
         case ${words[2]} in
             # these resolve through Couchbase, so an IP is not a valid argument
-            ip|config|forget)        _pente_edge_targets ids ;;
+            ip|config|forget) _pente_edge_targets ids ;;
+            fput|fget)
+                local -a fflags=('-f:overwrite an existing destination without asking')
+                _describe -t flags flag fflags
+                _pente_edge_targets
+                ;;
             run|connect|mongo|warm|close) _pente_edge_targets ;;
             *) return 1 ;;
         esac
@@ -400,6 +842,17 @@ _pente_edge() {
     case ${words[2]} in
         run)   _message 'command to run on the edge' ;;
         mongo) _message 'javascript for mongosh --eval' ;;
+        # scp order: sources first, destination last. Remote paths are completed
+        # from the LOCAL filesystem too -- real remote completion would need an
+        # ssh round trip per keypress, and edge paths mirror local ones closely
+        # enough (/var/log/pente/..., /home/pente/...) to be a useful guess.
+        fput|fget)
+            # the mirror placeholder, then ordinary local paths (which are also
+            # offered for the *remote* argument -- see the note above)
+            local -a mirror=("${_pente_edge_mirror}:same path on the other side")
+            _describe -t mirror placeholder mirror
+            _files
+            ;;
         *)     return 1 ;;
     esac
 }
@@ -408,12 +861,25 @@ compdef _pente_edge pente-edge
 ZSHCOMP
 }
 
+# Drops all three caches, not just the DB row: a probed address is now trusted
+# for as long as the DB facts are, so a stale one has to be forgettable the same
+# way. The host-key marker goes too, since it is keyed by the address we drop.
 cmd_forget() {
+  local f ip
   if [[ $# -ge 1 ]]; then
     [[ -f "$CACHE" ]] && { grep -v -P "^\Q$1\E\t" "$CACHE" > "$CACHE.tmp" || true; mv "$CACHE.tmp" "$CACHE"; }
-    note "dropped '$1' from cache"
+    f=$(chosen_file "$1")
+    if [[ -r "$f" ]]; then
+      ip=$(cat "$f")
+      rm -f "$f" "$HOSTKEY_DIR/$ip"
+      note "dropped '$1' from cache (and its probed address $ip)"
+    else
+      note "dropped '$1' from cache"
+    fi
   else
-    rm -f "$CACHE"; note "cache cleared"
+    rm -f "$CACHE"
+    rm -rf "$CHOSEN_DIR" "$HOSTKEY_DIR"
+    note "cache cleared (facts, probed addresses and host-key markers)"
   fi
 }
 
@@ -423,12 +889,14 @@ case "${1:-}" in
   run)     shift; cmd_run "$@" ;;
   connect) shift; cmd_connect "$@" ;;
   mongo)   shift; cmd_mongo "$@" ;;
+  fput)    shift; cmd_fput "$@" ;;
+  fget)    shift; cmd_fget "$@" ;;
   config)  shift; cmd_config "$@" ;;
   warm)    shift; cmd_warm "$@" ;;
   close)   shift; cmd_close "$@" ;;
   forget)  shift; cmd_forget "$@" ;;
   zsh_comp|zsh-completion) shift; cmd_zsh_comp "$@" ;;
   ""|-h|--help|help)
-    sed -n '2,19p' "$0" | sed 's/^# \{0,1\}//' ;;
+    sed -n '2,21p' "$0" | sed 's/^# \{0,1\}//' ;;
   *) die "unknown subcommand '$1' (try --help)" ;;
 esac

@@ -395,6 +395,13 @@ if $HAVE_PENTEEDGE; then
     else
         [[ $? -eq 2 ]] && source <(pente-edge zsh_comp)
     fi
+
+    # "nc" = no check: skip the EdgeShortId verification, so an address that
+    # answers is used even when the box reports a different edge id. Needed for
+    # edges whose vRouterIp is down and whose S1APAddress is shared - but it can
+    # land you on another edge, so it stays opt-in rather than the default.
+    alias pente-edge-nc='EDGE_VERIFY_ID=0 pente-edge'
+    (( $+functions[_pente_edge] )) && compdef _pente_edge pente-edge-nc
 fi
 
 function changeTps {
