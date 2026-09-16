@@ -1,6 +1,6 @@
 GIT_JPU_GGSN_PATH=git@bitbucket.org:jpugit/ggsn.git
 GIT_JPU_AMF_PATH=git@bitbucket.org:jpugit/pente-amfd.git
-GIT_JPU_CFG_MANAGER_PATH=git@bitbucket.org:jpugit/cfg-manager.git
+GIT_JPU_CFG_MANAGER_PATH=git@bitbucket.org:jpugit/cfgmanager.git
 GIT_JPU_CICD_PATH=git@bitbucket.org:jpugit/cicd.git
 GIT_JPU_HSS_PATH=git@bitbucket.org:jpugit/pente-hss.git
 GIT_JPU_MME_PATH=git@bitbucket.org:jpugit/open5gs.git
