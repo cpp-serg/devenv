@@ -2,7 +2,7 @@
 # Monitor GTP-C CSR (Create Session Request) status codes on a remote host.
 # Groups tshark output by 10-second buckets and counts unique status combinations.
 #
-# Usage: ./csr-monitor <host>
+# Usage: pente-csr-monitor <host>
 
 if [ $# -ne 1 ]; then
     echo "Usage: $0 <host>" >&2

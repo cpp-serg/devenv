@@ -16,7 +16,13 @@ function HaveFile {
 
 IS_SP_PRIVATE_HOST=$(HaveFile ${HOME}/.sp-private-host)
 
+# devenv scripts, plus one level of per-project subfolders (scripts/pente, ...)
+# so project-specific tools stay grouped without needing a PATH edit each time.
 export PATH="$PATH:$HOME/devenv/scripts"
+for _sp_scripts_dir in ${HOME}/devenv/scripts/*(/N); do
+    export PATH="$PATH:${_sp_scripts_dir}"
+done
+unset _sp_scripts_dir
 [[ -d "${HOME}/.local/bin" ]] && export PATH="$HOME/.local/bin:$PATH"
 
 # update-alternatives puts our canonical tool names (fd, bat, delta, nvim, tmux)
@@ -104,6 +110,7 @@ HAVE_PICKSSH=$(HaveTool pick-ssh)
 HAVE_LXD=$(HaveTool lxc)
 HAVE_CLAUDE=$(HaveTool claude)
 HAVE_NVIM=$(HaveTool nvim)
+HAVE_PENTEEDGE=$(HaveTool pente-edge)
 
 # Distribution, used to pick the right oh-my-zsh package plugins below.
 SP_OS_ID=""
@@ -378,6 +385,16 @@ if $HAVE_PICKSSH; then
         [[ $? -eq 2 ]] && source <(pick-ssh --embed zsh)
     fi
     export PICK_SSH_CONFIG="theme=catppuccin-mocha"
+fi
+
+# pente-edge completes edge ids/IPs from its own local cache, so this never
+# touches the CC. Refill the cache with `pente-edge list`.
+if $HAVE_PENTEEDGE; then
+    if sp_completion_cache pente-edge pente-edge zsh_comp; then
+        source $REPLY
+    else
+        [[ $? -eq 2 ]] && source <(pente-edge zsh_comp)
+    fi
 fi
 
 function changeTps {

@@ -1,0 +1,434 @@
+#!/usr/bin/env bash
+# pente-edge — resolve a Pente Edge by portal ID and connect to it through a HyperCore CC.
+#
+#   pente-edge ip      <id>                 → resolve ID → mgmt IP (cached)
+#   pente-edge list                         → all EdgeSites on the CC
+#   pente-edge run     <id|ip> <cmd...>     → run a command on the edge (non-interactive)
+#   pente-edge connect <id|ip>              → interactive shell on the edge
+#   pente-edge mongo   <id|ip> <js>         → mongosh --eval against the edge's local Mongo
+#   pente-edge config  <id>                 → append a reusable `Host EDGE-<id>` ssh block
+#   pente-edge warm    <id|ip>              → pre-open the shared ssh socket
+#   pente-edge close   <id|ip>              → close it (kills the holder session)
+#   pente-edge forget  [id]                 → drop cache entry (or whole cache)
+#   pente-edge zsh_comp                     → emit zsh completion; source it from
+#                                             your dotfiles (see the banner it prints)
+#
+# Configuration: every EDGE_* setting in the CONFIG block takes its value from
+# the environment variable of the same name when that is set, and otherwise from
+# the default written here. So `EDGE_PASS=… pente-edge run 2162 uptime` works
+# without editing this file, and `export EDGE_USER=admin` sticks for a shell.
+set -euo pipefail
+
+# ─── CONFIG — fill these in once ──────────────────────────────────────────────
+#
+# !! This file is tracked in the ~/devenv git repo and pushed to GitHub. !!
+# A real password typed into EDGE_PASS below can be committed and published.
+# Safer, in order: `export EDGE_PASS=…` from your shell; or put it in
+# $EDGE_PASS_FILE (mode 600, outside the repo); or fill it in here and keep
+# this file out of commits.
+#
+EDGE_CC="${EDGE_CC:-HC_CC1}"                    # CC holding the EdgeSite docs
+EDGE_USER="${EDGE_USER:-root}"                  # ssh user on the edge
+EDGE_PASS="${EDGE_PASS:-jpu2022}"                      # ssh password on the edge
+EDGE_PASS_FILE="${EDGE_PASS_FILE:-$HOME/.ssh/.pente-edge-pass}"   # fallback
+EDGE_MONGO_USER="${EDGE_MONGO_USER:-Administrator}"   # edge-local mongo
+EDGE_MONGO_PASS="${EDGE_MONGO_PASS:-admin123}"          # blank → platform default
+EDGE_CACHE_TTL="${EDGE_CACHE_TTL:-86400}"       # ID→IP cache lifetime, seconds
+EDGE_MASTER_TTL="${EDGE_MASTER_TTL:-3600}"      # shared ssh socket lifetime, sec
+# ──────────────────────────────────────────────────────────────────────────────
+
+CC="$EDGE_CC"
+PASSFILE="$EDGE_PASS_FILE"
+TTL="$EDGE_CACHE_TTL"
+CACHE="${XDG_CACHE_HOME:-$HOME/.cache}/pente-edge/edges.tsv"
+KNOWN="$HOME/.ssh/known_hosts_edges"
+SOCK="$HOME/.ssh/sockets/edge-%r@%h:%p"
+CFG_DIR="$HOME/.ssh/shared/edges"          # picked up by `Include shared/**/config`
+REMOTE_CFG=/home/pente/pente-server/config/localconfig.json
+
+die() { printf 'pente-edge: %s\n' "$*" >&2; exit 1; }
+note() { printf '%s\n' "$*" >&2; }
+
+# An edge ID/name goes into an N1QL string, so allow only safe characters.
+validate_key() {
+  [[ "$1" =~ ^[A-Za-z0-9_.-]+$ ]] || die "refusing unsafe edge id/name: '$1'"
+}
+is_ip() { [[ "$1" =~ ^[0-9]{1,3}(\.[0-9]{1,3}){3}$ ]]; }
+
+ssh_edge_opts() {
+  printf '%s\0' \
+    -o "StrictHostKeyChecking=accept-new" \
+    -o "UserKnownHostsFile=$KNOWN" \
+    -o "ControlMaster=auto" \
+    -o "ControlPath=$SOCK" \
+    -o "ControlPersist=60m" \
+    -o "ProxyJump=$CC" \
+    -o "ConnectTimeout=20"
+}
+
+# ---------------------------------------------------------------- resolution
+
+# Query the CC's Couchbase for one EdgeSite. Credentials are read out of the
+# CC's localconfig.json *inside* the remote shell and never reach stdout here.
+cc_query() {
+  local where="$1"
+  ssh -o BatchMode=yes "$CC" 'bash -s' <<REMOTE 2>/dev/null
+set -euo pipefail
+read -r U P H <<< "\$(python3 - "$REMOTE_CFG" <<'PY'
+import json, sys
+d = json.load(open(sys.argv[1]))
+cb = next((d[k] for k in ("couchbase", "Couchbase", "db", "database")
+           if isinstance(d.get(k), dict)), {})
+u = cb.get("username") or cb.get("user") or "Administrator"
+p = cb.get("password") or "admin123"
+h = cb.get("host") or cb.get("connectionString") or cb.get("url") or "127.0.0.1"
+h = h.replace("couchbase://", "").replace("http://", "").split(",")[0].split(":")[0]
+print(u, p, h)
+PY
+)"
+curl -s --max-time 30 -u "\$U:\$P" "http://\$H:8093/query/service" \
+  --data-urlencode 'statement=SELECT ShortId, Name, vRouterIp, S1APAddress, Version FROM JPUDB USE INDEX (i_TypeJpuDb) WHERE Type = "EdgeSite" AND ($where) ORDER BY ShortId LIMIT 200'
+REMOTE
+}
+
+# Turn the query envelope into TSV: shortid name ip s1ap version
+cc_query_tsv() {
+  cc_query "$1" | python3 -c '
+import sys, json
+raw = sys.stdin.read().strip()
+if not raw:
+    sys.exit("no response from CC Couchbase (is the query service reachable?)")
+d = json.loads(raw)
+if d.get("errors"):
+    sys.exit("couchbase: %s" % d["errors"])
+for r in d.get("results", []):
+    print("\t".join(str(r.get(k, "")) for k in
+          ("ShortId", "Name", "vRouterIp", "S1APAddress", "Version")))
+'
+}
+
+cache_get() {
+  [[ -f "$CACHE" ]] || return 1
+  local now line ts
+  now=$(date +%s)
+  while IFS=$'\t' read -r id name ip s1ap ver cc ts; do
+    [[ "$id" == "$1" || "$name" == "$1" ]] || continue
+    [[ "$cc" == "$CC" ]] || continue
+    (( now - ts < TTL )) || return 1
+    printf '%s\t%s\t%s\t%s\t%s\n' "$id" "$name" "$ip" "$s1ap" "$ver"
+    return 0
+  done < "$CACHE"
+  return 1
+}
+
+cache_put() {
+  mkdir -p "$(dirname "$CACHE")"
+  local id="$1"
+  [[ -f "$CACHE" ]] && { grep -v -P "^\Q$id\E\t" "$CACHE" > "$CACHE.tmp" 2>/dev/null || true; mv "$CACHE.tmp" "$CACHE"; }
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$1" "$2" "$3" "$4" "$5" "$CC" "$(date +%s)" >> "$CACHE"
+}
+
+# echoes: id name ip s1ap version
+resolve() {
+  local key="$1" row
+  validate_key "$key"
+  if row=$(cache_get "$key"); then printf '%s\n' "$row"; return 0; fi
+  row=$(cc_query_tsv "TOSTRING(ShortId) = \"$key\" OR LOWER(Name) = LOWER(\"$key\")" | head -1)
+  [[ -n "$row" ]] || die "no EdgeSite with ShortId/Name '$key' on $CC"
+  IFS=$'\t' read -r id name ip s1ap ver <<< "$row"
+  [[ -n "$ip" ]] || die "edge '$key' has no vRouterIp on $CC (never provisioned?)"
+  cache_put "$id" "$name" "$ip" "$s1ap" "$ver"
+  printf '%s\t%s\t%s\t%s\t%s\n' "$id" "$name" "$ip" "$s1ap" "$ver"
+}
+
+# accepts an ID, a name, or a literal IP; echoes just the IP
+target_ip() {
+  if is_ip "$1"; then printf '%s\n' "$1"; else resolve "$1" | cut -f3; fi
+}
+
+# Cache a whole listing at once (stdin: the same TSV resolve() emits). Rows for
+# edges not in this listing are kept, so caches for other CCs survive.
+cache_put_bulk() {
+  mkdir -p "$(dirname "$CACHE")"
+  local now tmp keep id name ip s1ap ver
+  now=$(date +%s); tmp=$(mktemp); keep=$(mktemp)
+  while IFS=$'\t' read -r id name ip s1ap ver; do
+    [[ -n "$id" ]] || continue
+    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$id" "$name" "$ip" "$s1ap" "$ver" "$CC" "$now"
+  done > "$tmp"
+  if [[ -s "$tmp" && -f "$CACHE" ]]; then
+    awk -F'\t' 'NR==FNR { seen[$1]=1; next } !($1 in seen)' "$tmp" "$CACHE" > "$keep"
+    cat "$keep" >> "$tmp"
+  fi
+  [[ -s "$tmp" ]] && mv "$tmp" "$CACHE" || rm -f "$tmp"
+  rm -f "$keep"
+}
+
+# ---------------------------------------------------------------- connection
+
+have_socket() {
+  local ip="$1"; local -a opts=()
+  while IFS= read -r -d '' o; do opts+=("$o"); done < <(ssh_edge_opts)
+  ssh "${opts[@]}" -O check "$EDGE_USER@$ip" >/dev/null 2>&1
+}
+
+have_pass() { [[ -n "$EDGE_PASS" || -r "$PASSFILE" ]]; }
+
+# Run one ssh with password auth. sshpass needs no tty of its own (it allocates
+# a pty), so this works fine from a non-interactive harness.
+pass_ssh() {
+  if [[ -n "$EDGE_PASS" ]]; then
+    # -e, not -p: keeps the password out of the process list
+    SSHPASS="$EDGE_PASS" sshpass -e ssh "$@"
+  else
+    sshpass -f "$PASSFILE" ssh "$@"
+  fi
+}
+
+# Open a shared ControlMaster socket so later calls need no password.
+#
+# The obvious `ssh -fN` does NOT work here: `-f` makes ssh background itself,
+# sshpass then exits, its pty closes and the edge answers "Connection closed by
+# remote host". So sshpass itself is backgrounded instead, holding the pty open
+# for a master session whose only job is to sleep.
+ensure_master() {
+  local ip="$1"
+  have_socket "$ip" && return 0
+  have_pass || return 1
+  local -a opts=()
+  while IFS= read -r -d '' o; do opts+=("$o"); done < <(ssh_edge_opts)
+  # setsid detaches the holder from this script's session so it survives our
+  # exit. It must exec a real binary — `setsid pass_ssh` cannot work, since
+  # pass_ssh is a shell function.
+  local -a holder=()
+  command -v setsid >/dev/null && holder=(setsid)
+  if [[ -n "$EDGE_PASS" ]]; then
+    SSHPASS="$EDGE_PASS" "${holder[@]}" sshpass -e ssh "${opts[@]}" \
+      -o ControlMaster=yes "$EDGE_USER@$ip" "sleep $EDGE_MASTER_TTL" \
+      >/dev/null 2>&1 </dev/null &
+  else
+    "${holder[@]}" sshpass -f "$PASSFILE" ssh "${opts[@]}" \
+      -o ControlMaster=yes "$EDGE_USER@$ip" "sleep $EDGE_MASTER_TTL" \
+      >/dev/null 2>&1 </dev/null &
+  fi
+  local holder_pid=$!
+  disown 2>/dev/null || true
+  local i
+  for i in $(seq 1 25); do
+    have_socket "$ip" && return 0
+    kill -0 "$holder_pid" 2>/dev/null || return 1   # holder died — stop waiting
+    sleep 1
+  done
+  return 1
+}
+
+# ssh to the edge, reusing (or opening) the shared socket; falls back to
+# per-call password auth, and finally to telling the user what to do.
+edge_ssh() {
+  local ip="$1"; shift
+  local -a opts=()
+  while IFS= read -r -d '' o; do opts+=("$o"); done < <(ssh_edge_opts)
+  mkdir -p "$HOME/.ssh/sockets"; chmod 700 "$HOME/.ssh/sockets"
+
+  if have_socket "$ip" || ensure_master "$ip"; then
+    ssh "${opts[@]}" "$EDGE_USER@$ip" "$@"
+  elif have_pass; then
+    note "note: could not open a shared socket; authenticating per call (slower)"
+    pass_ssh "${opts[@]}" "$EDGE_USER@$ip" "$@"
+  else
+    note "No live socket, EDGE_PASS is empty and $PASSFILE is unreadable."
+    note "Set EDGE_PASS in $(basename "$0"), or export EDGE_PASS, or:"
+    note "  printf '%s\\n' '<edge-password>' > $PASSFILE && chmod 600 $PASSFILE"
+    exit 2
+  fi
+}
+
+# ---------------------------------------------------------------- subcommands
+
+cmd_ip() {
+  [[ $# -ge 1 ]] || die "usage: pente-edge ip <id|name>"
+  IFS=$'\t' read -r id name ip s1ap ver < <(resolve "$1")
+  printf 'Edge %s (%s) on %s\n  mgmt (vRouterIp) : %s\n  S1AP             : %s\n  Version (target) : %s\n' \
+    "$id" "$name" "$CC" "$ip" "$s1ap" "$ver"
+}
+
+cmd_list() {
+  local rows
+  rows=$(cc_query_tsv 'ShortId IS NOT MISSING')
+  printf 'ShortId\tName\tvRouterIp\tS1APAddress\tVersion\n'
+  printf '%s\n' "$rows"
+  # Seed the cache from the listing — this is what makes shell completion useful.
+  printf '%s\n' "$rows" | cache_put_bulk
+}
+
+cmd_run() {
+  [[ $# -ge 2 ]] || die "usage: pente-edge run <id|ip> <command...>"
+  local ip; ip=$(target_ip "$1"); shift
+  edge_ssh "$ip" "$@"
+}
+
+cmd_connect() {
+  [[ $# -ge 1 ]] || die "usage: pente-edge connect <id|ip>"
+  local ip; ip=$(target_ip "$1")
+  note "→ $EDGE_USER@$ip via $CC"
+  edge_ssh "$ip"
+}
+
+cmd_mongo() {
+  [[ $# -ge 2 ]] || die "usage: pente-edge mongo <id|ip> <javascript>"
+  [[ -n "$EDGE_MONGO_PASS" ]] || die \
+    "EDGE_MONGO_PASS is empty — set it in the CONFIG block or export it (the
+ platform default is documented in the edge-mongo skill)"
+  local ip; ip=$(target_ip "$1"); shift
+  edge_ssh "$ip" mongosh --quiet \
+    "$(printf '%q' "mongodb://$EDGE_MONGO_USER:$EDGE_MONGO_PASS@127.0.0.1:27017/pente?authSource=admin")" \
+    --eval "$(printf '%q' "$1")"
+}
+
+cmd_config() {
+  [[ $# -ge 1 ]] || die "usage: pente-edge config <id|name>"
+  IFS=$'\t' read -r id name ip s1ap ver < <(resolve "$1")
+  mkdir -p "$CFG_DIR"
+  local f="$CFG_DIR/config"
+  touch "$f"; chmod 600 "$f"
+  if grep -qE "^Host EDGE-$id\b" "$f"; then
+    note "Host EDGE-$id already present in $f"
+  else
+    cat >> "$f" <<BLOCK
+
+Host EDGE-$id
+	# Edge $id ($name) — resolved from EdgeSite.vRouterIp on $CC
+	HostName $ip
+	User root
+	ProxyJump $CC
+	ControlMaster auto
+	ControlPath ~/.ssh/sockets/edge-%r@%h:%p
+	ControlPersist 60m
+	StrictHostKeyChecking accept-new
+	UserKnownHostsFile ~/.ssh/known_hosts_edges
+BLOCK
+    note "Added Host EDGE-$id → $ip in $f"
+  fi
+  grep -q 'Include shared' "$HOME/.ssh/config" \
+    || note "WARNING: ~/.ssh/config has no 'Include shared/**/config' — $f will be ignored."
+  printf 'ssh EDGE-%s\n' "$id"
+}
+
+cmd_warm() {
+  [[ $# -ge 1 ]] || die "usage: pente-edge warm <id|ip>"
+  local ip; ip=$(target_ip "$1")
+  if have_socket "$ip"; then note "socket already live for $ip"; return 0; fi
+  ensure_master "$ip" || die "could not open a shared socket to $ip"
+  note "socket open for $ip (${EDGE_MASTER_TTL}s)"
+}
+
+cmd_close() {
+  [[ $# -ge 1 ]] || die "usage: pente-edge close <id|ip>"
+  local ip; ip=$(target_ip "$1"); local -a opts=()
+  while IFS= read -r -d '' o; do opts+=("$o"); done < <(ssh_edge_opts)
+  ssh "${opts[@]}" -O exit "$EDGE_USER@$ip" 2>/dev/null && note "socket closed" \
+    || note "no live socket for $ip"
+}
+
+cmd_zsh_comp() {
+  cat <<'ZSHCOMP'
+# zsh completion for pente-edge. Source it from your dotfiles, after compinit:
+#
+#   command -v pente-edge >/dev/null && source <(pente-edge zsh_comp)
+#
+# Edge ids/IPs are completed from the local cache, never from the CC — nothing
+# here talks to production. `pente-edge list` refills that cache; a plain
+# `pente-edge ip <id>` adds the one edge it resolved.
+
+_pente_edge_cache_file() {
+    print -r -- "${EDGE_CACHE_FILE:-${XDG_CACHE_HOME:-$HOME/.cache}/pente-edge/edges.tsv}"
+}
+
+# $1: "ids" to offer only edge ids, anything else to offer ids and IPs
+_pente_edge_targets() {
+    local cache=$(_pente_edge_cache_file)
+    if [[ ! -r $cache ]]; then
+        _message 'no cached edges yet — run `pente-edge list`'
+        return 1
+    fi
+    local -a ids ips
+    # field order: id name ip s1ap version cc timestamp
+    ids=( ${(f)"$(awk -F'\t' '$1 != "" {
+            name = ($2 == "" ? "(unnamed)" : $2); gsub(/:/, "-", name)
+            print $1 ":" name (($3 == "") ? "" : " [" $3 "]")
+        }' $cache)"} )
+    _describe -t edge-ids 'edge id' ids
+    [[ $1 == ids ]] && return
+    ips=( ${(f)"$(awk -F'\t' '$3 != "" {
+            name = ($2 == "" ? "(unnamed)" : $2); gsub(/:/, "-", name)
+            print $3 ":" $1 " " name
+        }' $cache)"} )
+    _describe -t edge-ips 'edge ip' ips
+}
+
+_pente_edge() {
+    local -a subcmds
+    subcmds=(
+        'ip:resolve an edge id to its management IP'
+        'list:list every EdgeSite on the CC (also refills completions)'
+        'run:run a command on the edge'
+        'connect:open an interactive shell on the edge'
+        'mongo:run mongosh --eval on the edge'
+        'config:write a reusable `ssh EDGE-<id>` alias'
+        'warm:pre-open the shared ssh socket'
+        'close:close the shared ssh socket'
+        'forget:drop cached id-to-IP entries'
+        'zsh_comp:print this completion script'
+        'help:show usage'
+    )
+
+    if (( CURRENT == 2 )); then
+        _describe -t commands 'pente-edge command' subcmds
+        return
+    fi
+
+    if (( CURRENT == 3 )); then
+        case ${words[2]} in
+            # these resolve through Couchbase, so an IP is not a valid argument
+            ip|config|forget)        _pente_edge_targets ids ;;
+            run|connect|mongo|warm|close) _pente_edge_targets ;;
+            *) return 1 ;;
+        esac
+        return
+    fi
+
+    case ${words[2]} in
+        run)   _message 'command to run on the edge' ;;
+        mongo) _message 'javascript for mongosh --eval' ;;
+        *)     return 1 ;;
+    esac
+}
+
+compdef _pente_edge pente-edge
+ZSHCOMP
+}
+
+cmd_forget() {
+  if [[ $# -ge 1 ]]; then
+    [[ -f "$CACHE" ]] && { grep -v -P "^\Q$1\E\t" "$CACHE" > "$CACHE.tmp" || true; mv "$CACHE.tmp" "$CACHE"; }
+    note "dropped '$1' from cache"
+  else
+    rm -f "$CACHE"; note "cache cleared"
+  fi
+}
+
+case "${1:-}" in
+  ip)      shift; cmd_ip "$@" ;;
+  list)    shift; cmd_list "$@" ;;
+  run)     shift; cmd_run "$@" ;;
+  connect) shift; cmd_connect "$@" ;;
+  mongo)   shift; cmd_mongo "$@" ;;
+  config)  shift; cmd_config "$@" ;;
+  warm)    shift; cmd_warm "$@" ;;
+  close)   shift; cmd_close "$@" ;;
+  forget)  shift; cmd_forget "$@" ;;
+  zsh_comp|zsh-completion) shift; cmd_zsh_comp "$@" ;;
+  ""|-h|--help|help)
+    sed -n '2,19p' "$0" | sed 's/^# \{0,1\}//' ;;
+  *) die "unknown subcommand '$1' (try --help)" ;;
+esac
