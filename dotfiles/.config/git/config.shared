@@ -12,6 +12,32 @@
     lg2 ="!git logpretty --graph"
     lga2 ="!git lg2 --exclude='refs/prefetch/*' --all"
     lga ="!git lga2 --first-parent"
+    ; every ref except the ones on the far side of one or more fork branches:
+    ; for each <fork>, refs sharing commits with it past its merge base with
+    ; HEAD are dropped.  usage: git refs-nofork [fork...]
+    ; (no fork given: the fork.branch config, else MVNO)
+    refs-nofork = "!f() { \
+        [ -n \"${1:-}\" ] || set -- \"$(git config --default MVNO --get fork.branch)\"; \
+        list=$(git for-each-ref --format='%(refname)' --exclude='refs/prefetch/*'); \
+        for fork in \"$@\"; do \
+            base=$(git merge-base \"$fork\" HEAD) || { echo \"refs-nofork: no merge base with '$fork'\" >&2; exit 1; }; \
+            list=$(echo \"$list\" | while read -r r; do \
+                mb=$(git merge-base \"$r\" \"$fork\" 2>/dev/null) || continue; \
+                if [ \"$mb\" != \"$base\" ] && git merge-base --is-ancestor \"$base\" \"$mb\"; then continue; fi; \
+                echo \"$r\"; \
+            done); \
+        done; \
+        echo \"$list\"; }; f"
+    ; like lga2, but without the fork sides (see refs-nofork)
+    ; usage: git lgm [fork...] [git log options...]
+    lgm = "!f() { \
+        forks=; \
+        while [ -n \"${1:-}\" ]; do \
+            case \"$1\" in -*) break;; *) forks=\"$forks $1\"; shift;; esac; \
+        done; \
+        refs=$(git refs-nofork $forks) || return 1; \
+        [ -n \"$refs\" ] || { echo 'lgm: no refs left' >&2; return 1; }; \
+        git lg2 $refs \"$@\"; }; f"
     ; bt ="!git lg --simplify-by-decoration"
     bt ="!git lga2 --simplify-by-decoration"
     lg3 = log --graph --abbrev-commit --decorate --format=format:'%C(bold blue)%h%C(reset) - %C(bold cyan)%aD%C(reset) %C(bold green)(%ar)%C(reset)%C(bold yellow)%d%C(reset)%n''          %C(white)%s%C(reset) %C(dim white)- %an%C(reset)' --all
